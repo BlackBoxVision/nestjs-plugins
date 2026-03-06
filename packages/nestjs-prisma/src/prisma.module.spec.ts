@@ -1,3 +1,12 @@
+jest.mock('@prisma/client', () => {
+  return {
+    PrismaClient: class MockPrismaClient {
+      $connect = jest.fn().mockResolvedValue(undefined);
+      $disconnect = jest.fn().mockResolvedValue(undefined);
+    },
+  };
+});
+
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaModule } from './prisma.module';
 import { PrismaService } from './prisma.service';

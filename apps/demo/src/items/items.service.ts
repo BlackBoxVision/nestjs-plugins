@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@bbv/nestjs-prisma';
 import { PaginationDto, PaginatedResponseDto, paginate } from '@bbv/nestjs-pagination';
 
-interface Item {
+export interface Item {
   id: string;
   name: string;
   description: string | null;
