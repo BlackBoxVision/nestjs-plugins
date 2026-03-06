@@ -7,6 +7,7 @@ import {
   type SendNotificationPayload,
 } from './interfaces';
 import { InAppService } from './channels/in-app/in-app.service';
+import { DeviceTokenService } from './channels/push/device-token.service';
 import { PreferenceService } from './preferences/preference.service';
 
 @Injectable()
@@ -25,7 +26,12 @@ export class NotificationService {
     @InjectQueue('notifications-sms')
     private readonly smsQueue?: Queue,
     @Optional()
+    @InjectQueue('notifications-push')
+    private readonly pushQueue?: Queue,
+    @Optional()
     private readonly inAppService?: InAppService,
+    @Optional()
+    private readonly deviceTokenService?: DeviceTokenService,
     @Optional()
     private readonly preferenceService?: PreferenceService,
   ) {}
@@ -76,6 +82,9 @@ export class NotificationService {
         break;
       case 'sms':
         await this.routeSms(notification.id, payload);
+        break;
+      case 'push':
+        await this.routePush(notification.id, payload);
         break;
       default:
         this.logger.warn(`Unknown notification channel: ${channel}`);
@@ -165,5 +174,69 @@ export class NotificationService {
     });
 
     this.logger.log(`SMS notification ${notificationId} queued`);
+  }
+
+  private async routePush(
+    notificationId: string,
+    payload: SendNotificationPayload,
+  ): Promise<void> {
+    const pushConfig = this.options.channels.push;
+
+    if (!pushConfig || !pushConfig.enabled) {
+      this.logger.warn('Push channel is not enabled, skipping');
+      return;
+    }
+
+    if (!this.pushQueue) {
+      this.logger.error('Push queue is not available');
+      return;
+    }
+
+    // If explicit `to` is provided, send to that single token
+    if (payload.to) {
+      await this.pushQueue.add('send', {
+        notificationId,
+        token: payload.to,
+        title: payload.title,
+        body: payload.body,
+        data: payload.data as Record<string, string> | undefined,
+      });
+
+      this.logger.log(
+        `Push notification ${notificationId} queued for token ${payload.to}`,
+      );
+      return;
+    }
+
+    // Fan-out to all registered devices for the user
+    if (!this.deviceTokenService) {
+      this.logger.error('DeviceTokenService is not available');
+      return;
+    }
+
+    const devices = await this.deviceTokenService.findAllForUser(payload.userId);
+
+    if (devices.length === 0) {
+      this.logger.warn(
+        `No registered devices for user ${payload.userId}, skipping push`,
+      );
+      return;
+    }
+
+    await Promise.all(
+      devices.map((device: { token: string }) =>
+        this.pushQueue!.add('send', {
+          notificationId,
+          token: device.token,
+          title: payload.title,
+          body: payload.body,
+          data: payload.data as Record<string, string> | undefined,
+        }),
+      ),
+    );
+
+    this.logger.log(
+      `Push notification ${notificationId} queued for ${devices.length} device(s)`,
+    );
   }
 }

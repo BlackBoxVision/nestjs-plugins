@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getQueueToken } from '@nestjs/bullmq';
 import { NotificationService } from './notification.service';
 import { InAppService } from './channels/in-app/in-app.service';
+import { DeviceTokenService } from './channels/push/device-token.service';
 import { PreferenceService } from './preferences/preference.service';
 import {
   NOTIFICATION_MODULE_OPTIONS,
@@ -14,7 +15,9 @@ describe('NotificationService', () => {
   let mockPrisma: any;
   let mockEmailQueue: any;
   let mockSmsQueue: any;
+  let mockPushQueue: any;
   let mockInAppService: jest.Mocked<InAppService>;
+  let mockDeviceTokenService: jest.Mocked<DeviceTokenService>;
   let mockPreferenceService: jest.Mocked<PreferenceService>;
 
   const defaultOptions: NotificationModuleOptions = {
@@ -36,6 +39,13 @@ describe('NotificationService', () => {
           accountSid: 'AC123',
           authToken: 'token',
           from: '+1234567890',
+        },
+      },
+      push: {
+        enabled: true,
+        provider: 'firebase',
+        providerOptions: {
+          serviceAccountKey: { projectId: 'test' },
         },
       },
     },
@@ -63,12 +73,26 @@ describe('NotificationService', () => {
       add: jest.fn().mockResolvedValue({ id: 'job-sms-1' }),
     };
 
+    mockPushQueue = {
+      add: jest.fn().mockResolvedValue({ id: 'job-push-1' }),
+    };
+
     mockInAppService = {
       create: jest.fn().mockResolvedValue({ id: 'inapp-1' }),
       findAllForUser: jest.fn(),
       markAsRead: jest.fn(),
       markAllAsRead: jest.fn(),
       getUnreadCount: jest.fn(),
+    } as any;
+
+    mockDeviceTokenService = {
+      register: jest.fn(),
+      unregister: jest.fn(),
+      unregisterAll: jest.fn(),
+      findAllForUser: jest.fn().mockResolvedValue([
+        { id: 'dt-1', userId: 'user-1', token: 'device-token-1', platform: 'android' },
+        { id: 'dt-2', userId: 'user-1', token: 'device-token-2', platform: 'ios' },
+      ]),
     } as any;
 
     mockPreferenceService = {
@@ -97,8 +121,16 @@ describe('NotificationService', () => {
           useValue: mockSmsQueue,
         },
         {
+          provide: getQueueToken('notifications-push'),
+          useValue: mockPushQueue,
+        },
+        {
           provide: InAppService,
           useValue: mockInAppService,
+        },
+        {
+          provide: DeviceTokenService,
+          useValue: mockDeviceTokenService,
         },
         {
           provide: PreferenceService,
@@ -256,7 +288,9 @@ describe('NotificationService', () => {
           { provide: 'PRISMA_SERVICE', useValue: mockPrisma },
           { provide: getQueueToken('notifications-email'), useValue: mockEmailQueue },
           { provide: getQueueToken('notifications-sms'), useValue: mockSmsQueue },
+          { provide: getQueueToken('notifications-push'), useValue: mockPushQueue },
           { provide: InAppService, useValue: mockInAppService },
+          { provide: DeviceTokenService, useValue: mockDeviceTokenService },
           { provide: PreferenceService, useValue: mockPreferenceService },
         ],
       }).compile();
@@ -290,6 +324,98 @@ describe('NotificationService', () => {
       await service.send(payload);
 
       expect(mockSmsQueue.add).not.toHaveBeenCalled();
+    });
+
+    it('should fan out push notifications to all user devices', async () => {
+      const payload: SendNotificationPayload = {
+        userId: 'user-1',
+        channel: 'push',
+        type: 'alert',
+        title: 'New Alert',
+        body: 'Something happened',
+      };
+
+      const result = await service.send(payload);
+
+      expect(result).toEqual({ id: 'notif-1' });
+      expect(mockDeviceTokenService.findAllForUser).toHaveBeenCalledWith('user-1');
+      expect(mockPushQueue.add).toHaveBeenCalledTimes(2);
+      expect(mockPushQueue.add).toHaveBeenCalledWith('send', {
+        notificationId: 'notif-1',
+        token: 'device-token-1',
+        title: 'New Alert',
+        body: 'Something happened',
+        data: undefined,
+      });
+      expect(mockPushQueue.add).toHaveBeenCalledWith('send', {
+        notificationId: 'notif-1',
+        token: 'device-token-2',
+        title: 'New Alert',
+        body: 'Something happened',
+        data: undefined,
+      });
+    });
+
+    it('should send push to a single device when explicit to is provided', async () => {
+      const payload: SendNotificationPayload = {
+        userId: 'user-1',
+        channel: 'push',
+        type: 'alert',
+        title: 'New Alert',
+        body: 'Something happened',
+        to: 'explicit-device-token',
+      };
+
+      const result = await service.send(payload);
+
+      expect(result).toEqual({ id: 'notif-1' });
+      expect(mockDeviceTokenService.findAllForUser).not.toHaveBeenCalled();
+      expect(mockPushQueue.add).toHaveBeenCalledTimes(1);
+      expect(mockPushQueue.add).toHaveBeenCalledWith('send', {
+        notificationId: 'notif-1',
+        token: 'explicit-device-token',
+        title: 'New Alert',
+        body: 'Something happened',
+        data: undefined,
+      });
+    });
+
+    it('should not call push queue when push channel is disabled', async () => {
+      const disabledOptions: NotificationModuleOptions = {
+        ...defaultOptions,
+        channels: {
+          ...defaultOptions.channels,
+          push: { enabled: false },
+        },
+      };
+
+      const module = await Test.createTestingModule({
+        providers: [
+          NotificationService,
+          { provide: NOTIFICATION_MODULE_OPTIONS, useValue: disabledOptions },
+          { provide: 'PRISMA_SERVICE', useValue: mockPrisma },
+          { provide: getQueueToken('notifications-email'), useValue: mockEmailQueue },
+          { provide: getQueueToken('notifications-sms'), useValue: mockSmsQueue },
+          { provide: getQueueToken('notifications-push'), useValue: mockPushQueue },
+          { provide: InAppService, useValue: mockInAppService },
+          { provide: DeviceTokenService, useValue: mockDeviceTokenService },
+          { provide: PreferenceService, useValue: mockPreferenceService },
+        ],
+      }).compile();
+
+      const svc = module.get<NotificationService>(NotificationService);
+
+      const payload: SendNotificationPayload = {
+        userId: 'user-1',
+        channel: 'push',
+        type: 'alert',
+        title: 'Alert',
+        body: 'Alert text',
+      };
+
+      await svc.send(payload);
+
+      expect(mockPushQueue.add).not.toHaveBeenCalled();
     });
   });
 });

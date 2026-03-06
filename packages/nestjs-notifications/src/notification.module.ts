@@ -4,6 +4,7 @@ import {
   NOTIFICATION_MODULE_OPTIONS,
   EMAIL_PROVIDER,
   SMS_PROVIDER,
+  PUSH_PROVIDER,
   type NotificationModuleOptions,
   type NotificationModuleAsyncOptions,
 } from './interfaces';
@@ -12,12 +13,16 @@ import { InAppService } from './channels/in-app/in-app.service';
 import { InAppController } from './channels/in-app/in-app.controller';
 import { EmailProcessor } from './channels/email/email.processor';
 import { SmsProcessor } from './channels/sms/sms.processor';
+import { PushProcessor } from './channels/push/push.processor';
+import { DeviceTokenService } from './channels/push/device-token.service';
+import { DeviceTokenController } from './channels/push/device-token.controller';
 import { PreferenceService } from './preferences/preference.service';
 import { PreferenceController } from './preferences/preference.controller';
 import { TemplateService } from './templates/template.service';
 import { SmtpEmailProvider } from './channels/email/providers/smtp.provider';
 import { SendGridEmailProvider } from './channels/email/providers/sendgrid.provider';
 import { TwilioSmsProvider } from './channels/sms/providers/twilio.provider';
+import { FirebasePushProvider } from './channels/push/providers/firebase.provider';
 
 @Module({})
 export class NotificationModule {
@@ -90,6 +95,28 @@ export class NotificationModule {
       }
     }
 
+    // Push channel
+    if (options.channels.push?.enabled) {
+      const pushConfig = options.channels.push;
+      providers.push(this.createPushProvider(pushConfig));
+      providers.push(PushProcessor);
+      providers.push(DeviceTokenService);
+      controllers.push(DeviceTokenController);
+
+      if (options.queue?.redis) {
+        imports.push(
+          BullModule.registerQueue({
+            name: 'notifications-push',
+            connection: {
+              host: options.queue.redis.host,
+              port: options.queue.redis.port ?? 6379,
+              password: options.queue.redis.password,
+            },
+          }),
+        );
+      }
+    }
+
     // Preferences feature
     if (options.features?.preferences !== false) {
       providers.push(PreferenceService);
@@ -111,6 +138,8 @@ export class NotificationModule {
       controllers,
       exports: [NotificationService, NOTIFICATION_MODULE_OPTIONS, ...(
         options.channels.inApp?.enabled ? [InAppService] : []
+      ), ...(
+        options.channels.push?.enabled ? [DeviceTokenService] : []
       ), ...(
         options.features?.preferences !== false ? [PreferenceService] : []
       ), ...(
@@ -135,6 +164,7 @@ export class NotificationModule {
       optionsProvider,
       NotificationService,
       InAppService,
+      DeviceTokenService,
       PreferenceService,
       TemplateService,
       // Conditional email provider factory
@@ -161,9 +191,21 @@ export class NotificationModule {
         },
         inject: [NOTIFICATION_MODULE_OPTIONS],
       },
+      // Conditional push provider factory
+      {
+        provide: PUSH_PROVIDER,
+        useFactory: (options: NotificationModuleOptions) => {
+          const pushConfig = options.channels.push;
+          if (!pushConfig || !pushConfig.enabled) {
+            return null;
+          }
+          return this.instantiatePushProvider(pushConfig);
+        },
+        inject: [NOTIFICATION_MODULE_OPTIONS],
+      },
     ];
 
-    const controllers: Type[] = [InAppController, PreferenceController];
+    const controllers: Type[] = [InAppController, DeviceTokenController, PreferenceController];
 
     return {
       module: NotificationModule,
@@ -174,6 +216,7 @@ export class NotificationModule {
         NotificationService,
         NOTIFICATION_MODULE_OPTIONS,
         InAppService,
+        DeviceTokenService,
         PreferenceService,
         TemplateService,
       ],
@@ -228,6 +271,26 @@ export class NotificationModule {
         return new TwilioSmsProvider(config.providerOptions);
       default:
         throw new Error(`Unknown SMS provider: ${(config as any).provider}`);
+    }
+  }
+
+  private static createPushProvider(
+    config: Extract<NotificationModuleOptions['channels']['push'], { enabled: true }>,
+  ): Provider {
+    return {
+      provide: PUSH_PROVIDER,
+      useValue: this.instantiatePushProvider(config),
+    };
+  }
+
+  private static instantiatePushProvider(
+    config: Extract<NotificationModuleOptions['channels']['push'], { enabled: true }>,
+  ) {
+    switch (config.provider) {
+      case 'firebase':
+        return new FirebasePushProvider(config.providerOptions);
+      default:
+        throw new Error(`Unknown push provider: ${(config as any).provider}`);
     }
   }
 }

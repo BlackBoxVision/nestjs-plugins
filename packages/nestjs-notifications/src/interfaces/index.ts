@@ -94,6 +94,32 @@ export type SmsChannelConfig =
     }
   | { enabled: false };
 
+export interface PushProvider {
+  send(options: PushSendOptions): Promise<void>;
+}
+
+export interface PushSendOptions {
+  token: string;
+  title: string;
+  body: string;
+  data?: Record<string, string>;
+  android?: Record<string, unknown>;
+  apns?: Record<string, unknown>;
+  webpush?: Record<string, unknown>;
+}
+
+export interface FirebaseProviderOptions {
+  serviceAccountKey: Record<string, unknown>;
+}
+
+export type PushChannelConfig =
+  | {
+      enabled: true;
+      provider: 'firebase';
+      providerOptions: FirebaseProviderOptions;
+    }
+  | { enabled: false };
+
 export interface InAppChannelConfig {
   enabled: boolean;
 }
@@ -102,6 +128,7 @@ export interface NotificationFeatures {
   email?: boolean;
   inApp?: boolean;
   sms?: boolean;
+  push?: boolean;
   preferences?: boolean;
   templates?: boolean;
 }
@@ -111,6 +138,7 @@ export interface NotificationModuleOptions {
     email?: EmailChannelConfig;
     inApp?: InAppChannelConfig;
     sms?: SmsChannelConfig;
+    push?: PushChannelConfig;
   };
   features?: NotificationFeatures;
   queue?: {
@@ -128,7 +156,7 @@ export interface NotificationModuleAsyncOptions {
 
 export interface SendNotificationPayload {
   userId: string;
-  channel: 'email' | 'in_app' | 'sms';
+  channel: 'email' | 'in_app' | 'sms' | 'push';
   type: string;
   title: string;
   body: string;
@@ -139,3 +167,4 @@ export interface SendNotificationPayload {
 export const NOTIFICATION_MODULE_OPTIONS = 'NOTIFICATION_MODULE_OPTIONS';
 export const EMAIL_PROVIDER = 'EMAIL_PROVIDER';
 export const SMS_PROVIDER = 'SMS_PROVIDER';
+export const PUSH_PROVIDER = 'PUSH_PROVIDER';

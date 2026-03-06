@@ -20,6 +20,13 @@ export { TwilioSmsProvider } from './channels/sms/providers/twilio.provider';
 export { SmsProcessor } from './channels/sms/sms.processor';
 export type { SmsJobData } from './channels/sms/sms.processor';
 
+// Push providers
+export { FirebasePushProvider } from './channels/push/providers/firebase.provider';
+export { PushProcessor } from './channels/push/push.processor';
+export type { PushJobData } from './channels/push/push.processor';
+export { DeviceTokenService } from './channels/push/device-token.service';
+export { DeviceTokenController } from './channels/push/device-token.controller';
+
 // Preferences
 export { PreferenceService } from './preferences/preference.service';
 export { PreferenceController } from './preferences/preference.controller';
@@ -32,6 +39,7 @@ export {
   NOTIFICATION_MODULE_OPTIONS,
   EMAIL_PROVIDER,
   SMS_PROVIDER,
+  PUSH_PROVIDER,
 } from './interfaces';
 
 export type {
@@ -40,13 +48,17 @@ export type {
   EmailAttachment,
   SmsProvider,
   SmsSendOptions,
+  PushProvider,
+  PushSendOptions,
   SmtpProviderOptions,
   SendGridProviderOptions,
   SESProviderOptions,
   ResendProviderOptions,
   TwilioProviderOptions,
+  FirebaseProviderOptions,
   EmailChannelConfig,
   SmsChannelConfig,
+  PushChannelConfig,
   InAppChannelConfig,
   NotificationFeatures,
   NotificationModuleOptions,
