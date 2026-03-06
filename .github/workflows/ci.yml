@@ -7,14 +7,77 @@ on:
     branches: [main]
 
 jobs:
-  ci:
-    name: Lint, Typecheck, Build & Test
+  detect:
+    name: Detect changed packages
     runs-on: ubuntu-latest
+    outputs:
+      packages: ${{ steps.filter.outputs.changes }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            nestjs-audit-log:
+              - 'packages/nestjs-audit-log/**'
+              - 'tsconfig.base.json'
+              - 'jest.preset.ts'
+              - '.eslintrc.js'
+              - 'package.json'
+              - 'turbo.json'
+            nestjs-auth:
+              - 'packages/nestjs-auth/**'
+              - 'tsconfig.base.json'
+              - 'jest.preset.ts'
+              - '.eslintrc.js'
+              - 'package.json'
+              - 'turbo.json'
+            nestjs-notifications:
+              - 'packages/nestjs-notifications/**'
+              - 'tsconfig.base.json'
+              - 'jest.preset.ts'
+              - '.eslintrc.js'
+              - 'package.json'
+              - 'turbo.json'
+            nestjs-pagination:
+              - 'packages/nestjs-pagination/**'
+              - 'tsconfig.base.json'
+              - 'jest.preset.ts'
+              - '.eslintrc.js'
+              - 'package.json'
+              - 'turbo.json'
+            nestjs-prisma:
+              - 'packages/nestjs-prisma/**'
+              - 'tsconfig.base.json'
+              - 'jest.preset.ts'
+              - '.eslintrc.js'
+              - 'package.json'
+              - 'turbo.json'
+            nestjs-response:
+              - 'packages/nestjs-response/**'
+              - 'tsconfig.base.json'
+              - 'jest.preset.ts'
+              - '.eslintrc.js'
+              - 'package.json'
+              - 'turbo.json'
+            nestjs-storage:
+              - 'packages/nestjs-storage/**'
+              - 'tsconfig.base.json'
+              - 'jest.preset.ts'
+              - '.eslintrc.js'
+              - 'package.json'
+              - 'turbo.json'
 
+  ci:
+    name: ${{ matrix.package }}
+    needs: detect
+    if: needs.detect.outputs.packages != '[]'
+    runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
+        package: ${{ fromJson(needs.detect.outputs.packages) }}
         node-version: [20.x, 22.x]
-
     steps:
       - uses: actions/checkout@v4
 
@@ -28,13 +91,21 @@ jobs:
         run: npm ci
 
       - name: Lint
-        run: npm run lint
+        run: npx turbo run lint --filter=@bbv/${{ matrix.package }}
 
       - name: Typecheck
-        run: npm run typecheck
+        run: npx turbo run typecheck --filter=@bbv/${{ matrix.package }}
 
       - name: Build
-        run: npm run build
+        run: npx turbo run build --filter=@bbv/${{ matrix.package }}
 
-      - name: Test
-        run: npm run test
+      - name: Test with coverage
+        run: npx turbo run test:cov --filter=@bbv/${{ matrix.package }}
+
+      - name: Upload coverage
+        if: matrix.node-version == '22.x' && always()
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          flags: ${{ matrix.package }}
+          fail_ci_if_error: false

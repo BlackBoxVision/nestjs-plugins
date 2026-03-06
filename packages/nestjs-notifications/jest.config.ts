@@ -5,18 +5,14 @@ const config: Config = {
   ...baseConfig,
   displayName: 'nestjs-notifications',
   rootDir: '.',
-  testRegex: '.*\\.spec\\.ts$',
-  transform: {
-    '^.+\\.ts$': 'ts-jest',
+  coverageThreshold: {
+    global: {
+      branches: 15,
+      functions: 5,
+      lines: 15,
+      statements: 15,
+    },
   },
-  moduleFileExtensions: ['js', 'json', 'ts'],
-  collectCoverageFrom: [
-    'src/**/*.ts',
-    '!src/**/index.ts',
-    '!src/**/*.interface.ts',
-  ],
-  coverageDirectory: './coverage',
-  testEnvironment: 'node',
 };
 
 export default config;

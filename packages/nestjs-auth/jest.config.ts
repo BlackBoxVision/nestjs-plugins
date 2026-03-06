@@ -1,15 +1,17 @@
 import type { Config } from 'jest';
+import baseConfig from '../../jest.preset';
 
 const config: Config = {
-  moduleFileExtensions: ['js', 'json', 'ts'],
+  ...baseConfig,
   rootDir: '.',
-  testRegex: '.*\\.spec\\.ts$',
-  transform: {
-    '^.+\\.ts$': 'ts-jest',
+  coverageThreshold: {
+    global: {
+      branches: 10,
+      functions: 15,
+      lines: 20,
+      statements: 20,
+    },
   },
-  collectCoverageFrom: ['src/**/*.ts', '!src/**/index.ts'],
-  coverageDirectory: './coverage',
-  testEnvironment: 'node',
 };
 
 export default config;

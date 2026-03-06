@@ -15,6 +15,7 @@
     "test:cov": "turbo run test:cov",
     "docs": "turbo run docs",
     "clean": "turbo run clean",
+    "deps:graph": "turbo run build --graph",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "changeset": "changeset",
