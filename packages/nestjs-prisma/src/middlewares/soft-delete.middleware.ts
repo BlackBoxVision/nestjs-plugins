@@ -1,22 +1,37 @@
-import { Prisma } from '@prisma/client';
-
 /**
  * Prisma middleware that intercepts delete operations and converts them to
  * soft deletes by setting a `deletedAt` timestamp. It also filters out
  * soft-deleted records from find queries automatically.
  *
- * Usage:
+ * Usage with Prisma client extensions (v5+):
  * ```ts
- * const prisma = new PrismaClient();
+ * const prisma = new PrismaClient().$extends(softDeleteExtension());
+ * ```
+ *
+ * Or with legacy $use middleware (Prisma < 6):
+ * ```ts
  * prisma.$use(softDeleteMiddleware());
  * ```
  *
  * Models that use soft delete must have a `deletedAt DateTime?` field.
  */
-export function softDeleteMiddleware(): Prisma.Middleware {
+
+interface MiddlewareParams {
+  action: string;
+  args: Record<string, Record<string, unknown>>;
+  model?: string;
+  runInTransaction?: boolean;
+}
+
+type MiddlewareFn = (
+  params: MiddlewareParams,
+  next: (params: MiddlewareParams) => Promise<unknown>,
+) => Promise<unknown>;
+
+export function softDeleteMiddleware(): MiddlewareFn {
   return async (
-    params: Prisma.MiddlewareParams,
-    next: (params: Prisma.MiddlewareParams) => Promise<any>,
+    params: MiddlewareParams,
+    next: (params: MiddlewareParams) => Promise<unknown>,
   ) => {
     // Convert delete to soft delete (update with deletedAt)
     if (params.action === 'delete') {

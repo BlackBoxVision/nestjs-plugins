@@ -30,8 +30,8 @@ export {
 } from './dto';
 
 // Interfaces & Constants
-export {
-  AUTH_MODULE_OPTIONS,
+export { AUTH_MODULE_OPTIONS } from './interfaces';
+export type {
   AuthModuleOptions,
   AuthModuleAsyncOptions,
   AuthFeatures,

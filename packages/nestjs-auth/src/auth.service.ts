@@ -264,7 +264,7 @@ export class AuthService {
       refreshToken?: string;
     },
   ): Promise<{ user: AuthenticatedUser; accessToken: string }> {
-    let account = await this.prisma.account.findUnique({
+    const account = await this.prisma.account.findUnique({
       where: {
         provider_providerAccountId: {
           provider,

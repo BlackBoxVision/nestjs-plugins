@@ -1,3 +1,4 @@
+import * as https from 'https';
 import type {
   EmailProvider,
   EmailSendOptions,
@@ -38,20 +39,38 @@ export class SendGridEmailProvider implements EmailProvider {
       body['reply_to'] = { email: options.replyTo };
     }
 
-    const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${this.apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    });
+    const payload = JSON.stringify(body);
 
-    if (!response.ok) {
-      const errorBody = await response.text();
-      throw new Error(
-        `SendGrid API error (${response.status}): ${errorBody}`,
+    return new Promise<void>((resolve, reject) => {
+      const req = https.request(
+        {
+          hostname: 'api.sendgrid.com',
+          path: '/v3/mail/send',
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${this.apiKey}`,
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(payload),
+          },
+        },
+        (res) => {
+          let data = '';
+          res.on('data', (chunk: Buffer) => {
+            data += chunk.toString();
+          });
+          res.on('end', () => {
+            if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+              resolve();
+            } else {
+              reject(new Error(`SendGrid API error (${res.statusCode}): ${data}`));
+            }
+          });
+        },
       );
-    }
+
+      req.on('error', reject);
+      req.write(payload);
+      req.end();
+    });
   }
 }

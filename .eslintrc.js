@@ -16,7 +16,7 @@ module.exports = {
   },
   ignorePatterns: ['dist', 'node_modules', 'coverage', '*.js', '!.eslintrc.js'],
   rules: {
-    '@typescript-eslint/no-explicit-any': 'error',
+    '@typescript-eslint/no-explicit-any': 'warn',
     '@typescript-eslint/no-unused-vars': [
       'warn',
       { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },

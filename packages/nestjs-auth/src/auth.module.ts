@@ -115,7 +115,10 @@ export class AuthModule {
       providers.push({
         provide: GoogleStrategy,
         useFactory: () => {
-          return new GoogleStrategy(options.providers!.google!);
+          // Safe: guarded by options.providers?.google check above
+          const googleConfig = options.providers?.google;
+          if (!googleConfig) throw new Error('Google provider config missing');
+          return new GoogleStrategy(googleConfig);
         },
       });
     }

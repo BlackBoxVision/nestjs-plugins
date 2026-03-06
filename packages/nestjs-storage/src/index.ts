@@ -27,7 +27,7 @@ export {
 } from './decorators/file-upload.decorator';
 
 // Interfaces & Constants
-export {
+export type {
   StorageProvider,
   StorageModuleOptions,
   StorageModuleAsyncOptions,
@@ -40,6 +40,5 @@ export {
   UploadOptions,
   GetUrlOptions,
   UploadResult,
-  STORAGE_MODULE_OPTIONS,
-  STORAGE_PROVIDER,
 } from './interfaces';
+export { STORAGE_MODULE_OPTIONS, STORAGE_PROVIDER } from './interfaces';

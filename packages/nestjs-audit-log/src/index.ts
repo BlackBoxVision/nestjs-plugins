@@ -6,12 +6,12 @@ export {
   AuditedInterceptor,
   AUDIT_ACTION_KEY,
 } from './decorators/audited.decorator';
-export {
+export { AUDIT_LOG_MODULE_OPTIONS } from './interfaces';
+export type {
   AuditLogModuleOptions,
   AuditLogModuleAsyncOptions,
   AuditLogEntry,
   AuditLogQueryOptions,
-  AUDIT_LOG_MODULE_OPTIONS,
 } from './interfaces';
 export {
   AuditContextMiddleware,
