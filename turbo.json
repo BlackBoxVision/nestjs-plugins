@@ -1,0 +1,30 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "pipeline": {
+    "lint": {},
+    "typecheck": {
+      "dependsOn": ["^build"]
+    },
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "test": {
+      "dependsOn": ["build"]
+    },
+    "test:cov": {
+      "dependsOn": ["build"]
+    },
+    "docs": {
+      "dependsOn": ["build"],
+      "outputs": ["docs/**"]
+    },
+    "clean": {
+      "cache": false
+    }
+  }
+}

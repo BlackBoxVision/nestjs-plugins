@@ -1,0 +1,27 @@
+model Notification {
+  id         String    @id @default(cuid())
+  userId     String
+  channel    String
+  type       String
+  title      String
+  body       String
+  data       Json?
+  status     String    @default("pending")
+  readAt     DateTime?
+  sentAt     DateTime?
+  failReason String?
+  createdAt  DateTime  @default(now())
+
+  @@index([userId, channel])
+  @@index([userId, status])
+}
+
+model NotificationPreference {
+  id      String  @id @default(cuid())
+  userId  String
+  channel String
+  type    String
+  enabled Boolean @default(true)
+
+  @@unique([userId, channel, type])
+}
