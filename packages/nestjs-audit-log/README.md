@@ -206,22 +206,38 @@ When `features.registerController` is enabled:
 
 ## Architecture
 
-```
-AuditLogModule (global)
-  forRoot() / forRootAsync()
-  |
-  +-- AuditContextMiddleware       -- captures userId, IP, UA via AsyncLocalStorage
-  |     (applied to all routes)
-  |
-  +-- createAuditMiddleware()      -- Prisma $use middleware for auto CRUD tracking
-  |     +-- excludes configured entities/fields
-  |     +-- sanitizes sensitive data ([REDACTED])
-  |     +-- tracks old/new values on updates
-  |
-  +-- @Audited() decorator         -- route-level audit via AuditedInterceptor
-  |
-  +-- AuditLogService              -- log(), findAll(), findByEntity(), cleanup()
-  +-- AuditLogController           -- opt-in REST API for querying logs
+```mermaid
+graph TD
+    Module["AuditLogModule (global)<br/>forRoot() / forRootAsync()"]
+
+    CtxMW["AuditContextMiddleware<br/>captures userId, IP, UA<br/>via AsyncLocalStorage"]
+    PrismaMW["createAuditMiddleware()<br/>Prisma $use for auto CRUD"]
+    Decorator["@Audited() decorator<br/>route-level audit via<br/>AuditedInterceptor"]
+    Service["AuditLogService<br/>log(), findAll(), findByEntity(), cleanup()"]
+    Controller["AuditLogController<br/>/audit-logs<br/><i>opt-in</i>"]
+
+    Module --> CtxMW
+    Module --> PrismaMW
+    Module --> Decorator
+    Module --> Service
+    Module --> Controller
+
+    CtxMW -->|"provides context"| PrismaMW
+    CtxMW -->|"provides context"| Decorator
+    PrismaMW -->|"writes entries"| Service
+    Decorator -->|"writes entries"| Service
+    Controller -->|"queries"| Service
+
+    PrismaMW -.-> Exclude["Exclude entities/fields"]
+    PrismaMW -.-> Sanitize["Sanitize sensitive data"]
+    PrismaMW -.-> Changes["Track old/new values"]
+
+    style Module fill:#e3f2fd,stroke:#1565c0
+    style Service fill:#fff3e0,stroke:#e65100
+    style Controller fill:#e8f5e9,stroke:#2e7d32
+    style CtxMW fill:#fce4ec,stroke:#c62828
+    style PrismaMW fill:#fce4ec,stroke:#c62828
+    style Decorator fill:#f3e5f5,stroke:#6a1b9a
 ```
 
 ## License

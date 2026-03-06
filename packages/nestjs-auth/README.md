@@ -266,22 +266,47 @@ providers: {
 
 ## Architecture
 
-```
-AuthModule
-  forRoot() / forRootAsync()
-  |
-  +-- AuthController (/auth)          -- registration, login, social, verify, reset, profile, sessions
-  +-- OrganizationController (/organizations)  -- CRUD + membership (feature-gated)
-  |
-  +-- AuthService                     -- business logic, token generation, user management
-  +-- OrganizationService             -- org CRUD, member management
-  |
-  +-- JwtStrategy                     -- Passport JWT validation
-  +-- LocalStrategy                   -- Passport email/password validation
-  +-- GoogleStrategy                  -- Passport Google OAuth (conditionally registered)
-  |
-  +-- JwtAuthGuard                    -- route protection, @Public() support
-  +-- RolesGuard                      -- @Roles() enforcement
+```mermaid
+graph TD
+    Module["AuthModule<br/>forRoot() / forRootAsync()"]
+
+    subgraph Controllers
+        AuthCtrl["AuthController<br/>/auth"]
+        OrgCtrl["OrganizationController<br/>/organizations"]
+    end
+
+    subgraph Services
+        AuthSvc["AuthService<br/>business logic, tokens, users"]
+        OrgSvc["OrganizationService<br/>org CRUD, members"]
+    end
+
+    subgraph Strategies ["Passport Strategies"]
+        JWT["JwtStrategy"]
+        Local["LocalStrategy"]
+        Google["GoogleStrategy<br/><i>conditional</i>"]
+    end
+
+    subgraph Guards
+        JwtGuard["JwtAuthGuard<br/>@Public() support"]
+        RolesGuard["RolesGuard<br/>@Roles() enforcement"]
+    end
+
+    Module --> Controllers
+    Module --> Services
+    Module --> Strategies
+    Module --> Guards
+
+    AuthCtrl --> AuthSvc
+    OrgCtrl --> OrgSvc
+    AuthSvc --> JWT
+    AuthSvc --> Local
+    AuthSvc --> Google
+
+    style Module fill:#e3f2fd,stroke:#1565c0
+    style AuthCtrl fill:#e8f5e9,stroke:#2e7d32
+    style OrgCtrl fill:#e8f5e9,stroke:#2e7d32
+    style AuthSvc fill:#fff3e0,stroke:#e65100
+    style OrgSvc fill:#fff3e0,stroke:#e65100
 ```
 
 ## License

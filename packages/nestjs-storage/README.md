@@ -223,22 +223,35 @@ When `features.registerController` is enabled:
 
 ## Architecture
 
-```
-StorageModule
-  forRoot() / forRootAsync()
-  |
-  +-- StorageController (/storage)  -- opt-in REST endpoints
-  |
-  +-- StorageService                -- upload, getUrl, delete, exists
-  |     +-- validates file (size, MIME type)
-  |     +-- delegates to StorageProvider
-  |     +-- tracks in Prisma (if trackUploads)
-  |
-  +-- StorageProvider (interface)
-        +-- S3StorageProvider       -- AWS SDK v3
-        +-- FirebaseStorageProvider
-        +-- DOSpacesStorageProvider
-        +-- LocalStorageProvider    -- filesystem
+```mermaid
+graph TD
+    Module["StorageModule<br/>forRoot() / forRootAsync()"]
+    Controller["StorageController<br/>/storage<br/><i>opt-in</i>"]
+    Service["StorageService<br/>upload, getUrl, delete, exists"]
+    Validate["Validate file<br/>size & MIME type"]
+    Track["Track in Prisma<br/><i>if trackUploads</i>"]
+
+    Module --> Controller
+    Module --> Service
+
+    Service --> Validate
+    Service --> Provider
+    Service -.-> Track
+
+    subgraph Provider ["StorageProvider (interface)"]
+        S3["S3StorageProvider<br/>AWS SDK v3"]
+        Firebase["FirebaseStorageProvider"]
+        DO["DOSpacesStorageProvider"]
+        Local["LocalStorageProvider<br/>filesystem"]
+    end
+
+    style Module fill:#e3f2fd,stroke:#1565c0
+    style Service fill:#fff3e0,stroke:#e65100
+    style Controller fill:#e8f5e9,stroke:#2e7d32
+    style S3 fill:#f3e5f5,stroke:#6a1b9a
+    style Firebase fill:#f3e5f5,stroke:#6a1b9a
+    style DO fill:#f3e5f5,stroke:#6a1b9a
+    style Local fill:#f3e5f5,stroke:#6a1b9a
 ```
 
 ## License

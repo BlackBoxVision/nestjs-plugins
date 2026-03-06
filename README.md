@@ -6,19 +6,29 @@ Each module is a self-contained feature -- own Prisma schema, feature flags, pro
 
 ## Architecture
 
+```mermaid
+graph TD
+    App["Your NestJS App"]
+
+    App --> Prisma["PrismaModule<br/><code>@bbv/nestjs-prisma</code>"]
+    App --> Pagination["PaginationDto, paginate()<br/><code>@bbv/nestjs-pagination</code>"]
+    App --> Response["TransformInterceptor, Filter<br/><code>@bbv/nestjs-response</code>"]
+
+    Prisma --> Auth["AuthModule<br/><code>@bbv/nestjs-auth</code>"]
+    Prisma --> Notifications["NotificationModule<br/><code>@bbv/nestjs-notifications</code>"]
+    Prisma --> Storage["StorageModule<br/><code>@bbv/nestjs-storage</code>"]
+    Prisma --> AuditLog["AuditLogModule<br/><code>@bbv/nestjs-audit-log</code>"]
+
+    style Prisma fill:#e3f2fd,stroke:#1565c0
+    style Auth fill:#fce4ec,stroke:#c62828
+    style Notifications fill:#fce4ec,stroke:#c62828
+    style Storage fill:#fce4ec,stroke:#c62828
+    style AuditLog fill:#fce4ec,stroke:#c62828
+    style Pagination fill:#f3e5f5,stroke:#6a1b9a
+    style Response fill:#f3e5f5,stroke:#6a1b9a
 ```
-  Your NestJS App
-  |
-  +-- PrismaModule (@bbv/nestjs-prisma)        <-- foundation, all plugins depend on this
-  |     |
-  |     +-- AuthModule              (@bbv/nestjs-auth)           Tier 1 plugin
-  |     +-- NotificationModule      (@bbv/nestjs-notifications)  Tier 1 plugin
-  |     +-- StorageModule           (@bbv/nestjs-storage)        Tier 1 plugin
-  |     +-- AuditLogModule          (@bbv/nestjs-audit-log)      Tier 1 plugin
-  |
-  +-- PaginationDto, paginate()    (@bbv/nestjs-pagination)      Tier 2 utility
-  +-- TransformInterceptor, Filter (@bbv/nestjs-response)        Tier 2 utility
-```
+
+> **Blue** = Foundation &nbsp;|&nbsp; **Red** = Tier 1 Plugin Modules &nbsp;|&nbsp; **Purple** = Tier 2 Utilities
 
 ## Packages
 

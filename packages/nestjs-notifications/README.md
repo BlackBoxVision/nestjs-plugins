@@ -266,30 +266,38 @@ Preferences are checked automatically before sending. If a user has disabled a c
 
 ## Architecture
 
-```
-NotificationModule
-  forRoot() / forRootAsync()
-  |
-  +-- NotificationService           -- unified send() API, routes to channels
-  |     |
-  |     +-- routeEmail()            -- queues to BullMQ 'notifications-email'
-  |     +-- routeInApp()            -- delegates to InAppService
-  |     +-- routeSms()              -- queues to BullMQ 'notifications-sms'
-  |
-  +-- EmailProcessor                -- BullMQ worker, uses EMAIL_PROVIDER
-  |     +-- SmtpEmailProvider       -- nodemailer
-  |     +-- SendGridEmailProvider   -- SendGrid API
-  |
-  +-- SmsProcessor                  -- BullMQ worker, uses SMS_PROVIDER
-  |     +-- TwilioSmsProvider       -- Twilio API
-  |
-  +-- InAppService                  -- direct Prisma writes (no queue)
-  +-- InAppController               -- REST API for in-app notifications
-  |
-  +-- PreferenceService             -- user notification preferences
-  +-- PreferenceController          -- REST API for preferences
-  |
-  +-- TemplateService               -- Handlebars template rendering + caching
+```mermaid
+graph TD
+    Module["NotificationModule<br/>forRoot() / forRootAsync()"]
+    NService["NotificationService<br/>unified send() API"]
+
+    Module --> NService
+    Module --> Templates["TemplateService<br/>Handlebars + caching"]
+
+    NService -->|"channel: email"| EmailQ["BullMQ Queue<br/>notifications-email"]
+    NService -->|"channel: in_app"| InApp["InAppService<br/>direct Prisma writes"]
+    NService -->|"channel: sms"| SmsQ["BullMQ Queue<br/>notifications-sms"]
+
+    EmailQ --> EmailProc["EmailProcessor"]
+    EmailProc --> SMTP["SmtpEmailProvider<br/>nodemailer"]
+    EmailProc --> SendGrid["SendGridEmailProvider"]
+
+    SmsQ --> SmsProc["SmsProcessor"]
+    SmsProc --> Twilio["TwilioSmsProvider"]
+
+    InApp --> InAppCtrl["InAppController<br/>/notifications"]
+
+    Module --> PrefSvc["PreferenceService"]
+    PrefSvc --> PrefCtrl["PreferenceController<br/>/notification-preferences"]
+
+    style Module fill:#e3f2fd,stroke:#1565c0
+    style NService fill:#fff3e0,stroke:#e65100
+    style EmailQ fill:#fce4ec,stroke:#c62828
+    style SmsQ fill:#fce4ec,stroke:#c62828
+    style InApp fill:#e8f5e9,stroke:#2e7d32
+    style SMTP fill:#f3e5f5,stroke:#6a1b9a
+    style SendGrid fill:#f3e5f5,stroke:#6a1b9a
+    style Twilio fill:#f3e5f5,stroke:#6a1b9a
 ```
 
 ## License

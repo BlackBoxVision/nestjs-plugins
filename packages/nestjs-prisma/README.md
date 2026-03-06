@@ -174,16 +174,25 @@ describe('UserService', () => {
 
 ## Architecture
 
-```
-PrismaModule
-  forRoot() / forRootAsync()  --> registers PrismaService as provider + export
-  |
-  PrismaService (extends PrismaClient)
-    onModuleInit()    --> $connect()
-    onModuleDestroy() --> $disconnect()
+```mermaid
+graph TD
+    Module["PrismaModule<br/>forRoot() / forRootAsync()"]
+    Service["PrismaService<br/><i>extends PrismaClient</i>"]
+    Init["onModuleInit() → $connect()"]
+    Destroy["onModuleDestroy() → $disconnect()"]
+    SoftDelete["softDeleteMiddleware()<br/>opt-in Prisma middleware"]
+    Mock["createMockPrismaService()<br/>testing utility (Proxy-based)"]
 
-softDeleteMiddleware()       --> opt-in Prisma middleware
-createMockPrismaService()    --> testing utility (Proxy-based)
+    Module -->|registers & exports| Service
+    Service --> Init
+    Service --> Destroy
+    Module -.->|optional| SoftDelete
+    Module -.->|testing| Mock
+
+    style Module fill:#e3f2fd,stroke:#1565c0
+    style Service fill:#e3f2fd,stroke:#1565c0
+    style SoftDelete fill:#fff3e0,stroke:#e65100
+    style Mock fill:#f3e5f5,stroke:#6a1b9a
 ```
 
 ## License
