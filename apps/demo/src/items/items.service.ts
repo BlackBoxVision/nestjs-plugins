@@ -16,22 +16,28 @@ export interface Item {
 export class ItemsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private get itemModel() {
+    return (this.prisma as unknown as Record<string, unknown>)['item'] as {
+      findMany: (args: Record<string, unknown>) => Promise<Item[]>;
+      count: (args: Record<string, unknown>) => Promise<number>;
+      findUnique: (args: Record<string, unknown>) => Promise<Item | null>;
+      create: (args: Record<string, unknown>) => Promise<Item>;
+    };
+  }
+
   async findAll(pagination: PaginationDto): Promise<PaginatedResponseDto<Item>> {
     return paginate<Item>({
-      model: (this.prisma as Record<string, unknown>)['item'] as {
-        findMany: (args: Record<string, unknown>) => Promise<unknown[]>;
-        count: (args: Record<string, unknown>) => Promise<number>;
-      },
+      model: this.itemModel,
       pagination,
       orderBy: { createdAt: 'desc' },
     });
   }
 
   async findOne(id: string) {
-    return (this.prisma as Record<string, unknown>)['item'];
+    return this.itemModel.findUnique({ where: { id } });
   }
 
   async create(data: { name: string; description?: string; createdBy?: string }) {
-    return (this.prisma as Record<string, unknown>)['item'];
+    return this.itemModel.create({ data });
   }
 }

@@ -11,7 +11,7 @@ export class OrganizationService {
   private readonly prisma: any;
 
   constructor(
-    @Inject('PrismaService')
+    @Inject('PRISMA_SERVICE')
     prisma: any,
   ) {
     this.prisma = prisma;

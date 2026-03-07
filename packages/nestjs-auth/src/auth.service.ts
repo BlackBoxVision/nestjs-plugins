@@ -25,7 +25,7 @@ export class AuthService {
   constructor(
     @Inject(AUTH_MODULE_OPTIONS)
     private readonly options: AuthModuleOptions,
-    @Inject('PrismaService')
+    @Inject('PRISMA_SERVICE')
     prisma: any,
     private readonly jwtService: JwtService,
   ) {

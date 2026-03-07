@@ -7,15 +7,22 @@ import {
 
 const PRISMA_MODULE_OPTIONS = 'PRISMA_MODULE_OPTIONS';
 
+function createPrismaAliases() {
+  return [
+    { provide: 'PRISMA_SERVICE', useExisting: PrismaService },
+  ];
+}
+
 @Module({})
 export class PrismaModule {
   static forRoot(options?: PrismaModuleOptions): DynamicModule {
-    const providers = [PrismaService];
+    const aliases = createPrismaAliases();
+    const providers = [PrismaService, ...aliases];
 
     const module: DynamicModule = {
       module: PrismaModule,
       providers,
-      exports: [PrismaService],
+      exports: [PrismaService, ...aliases],
     };
 
     if (options?.isGlobal) {
@@ -26,6 +33,7 @@ export class PrismaModule {
   }
 
   static forRootAsync(options: PrismaModuleAsyncOptions): DynamicModule {
+    const aliases = createPrismaAliases();
     const asyncProviders = [
       {
         provide: PRISMA_MODULE_OPTIONS,
@@ -33,13 +41,14 @@ export class PrismaModule {
         inject: options.inject ?? [],
       },
       PrismaService,
+      ...aliases,
     ];
 
     const module: DynamicModule = {
       module: PrismaModule,
       imports: options.imports ?? [],
       providers: asyncProviders,
-      exports: [PrismaService],
+      exports: [PrismaService, ...aliases],
     };
 
     if (options.isGlobal) {

@@ -21,7 +21,7 @@ export class StorageService {
     @Inject(STORAGE_MODULE_OPTIONS)
     private readonly options: StorageModuleOptions,
     @Optional()
-    @Inject('PrismaService')
+    @Inject('PRISMA_SERVICE')
     private readonly prismaService?: any,
   ) {}
 
