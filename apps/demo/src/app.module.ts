@@ -1,8 +1,9 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { PrismaModule } from '@bbv/nestjs-prisma';
-import { AuthModule } from '@bbv/nestjs-auth';
+import { AuthModule, JwtAuthGuard } from '@bbv/nestjs-auth';
 import { OtpModule } from '@bbv/nestjs-otp';
 import { StorageModule } from '@bbv/nestjs-storage';
 import { NotificationModule, AuthNotificationModule } from '@bbv/nestjs-notifications';
@@ -163,6 +164,12 @@ import * as path from 'path';
     }),
 
     ItemsModule,
+  ],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard,
+    },
   ],
   controllers: [AppController],
 })

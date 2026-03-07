@@ -255,15 +255,11 @@ describe('Demo App (e2e)', () => {
       itemId = res.body.data.id;
     });
 
-    it('POST /items without auth should still create (no global guard on items)', async () => {
-      const res = await request(httpServer)
+    it('POST /items without auth should be rejected', async () => {
+      await request(httpServer)
         .post('/items')
         .send({ name: 'No Auth Item' })
-        .expect(201);
-
-      expect(res.body.success).toBe(true);
-      expect(res.body.data.name).toBe('No Auth Item');
-      expect(res.body.data.createdBy).toBeNull();
+        .expect(401);
     });
 
     it('GET /items/:id should return single item (public)', async () => {
@@ -309,10 +305,8 @@ describe('Demo App (e2e)', () => {
       expect(res.body.data.count).toBeDefined();
     });
 
-    it('GET /notifications without auth returns empty (no global guard)', async () => {
-      const res = await request(httpServer).get('/notifications').expect(200);
-
-      expect(res.body.success).toBe(true);
+    it('GET /notifications without auth should be rejected', async () => {
+      await request(httpServer).get('/notifications').expect(401);
     });
   });
 
@@ -329,22 +323,12 @@ describe('Demo App (e2e)', () => {
     });
 
     it('PUT /notification-preferences should upsert preference (authenticated)', async () => {
-      // The preference controller reads userId from req.user which is set
-      // by the JWT strategy. Without the global APP_GUARD, userId may be
-      // undefined for unauthenticated requests, causing a Prisma error.
-      // With a valid token, it should work if the controller properly
-      // extracts the user ID.
       const res = await request(httpServer)
         .put('/notification-preferences')
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ channel: 'email', type: 'marketing', enabled: false });
 
-      // This endpoint reads userId from req.user which requires the
-      // JwtAuthGuard or a global guard to populate. Since the demo app
-      // doesn't apply a global guard to this controller, userId may be
-      // undefined even with a valid bearer token, causing a 500.
-      // We accept either 200 (working) or 500 (known limitation).
-      expect([200, 500]).toContain(res.status);
+      expect(res.status).toBe(200);
     });
   });
 

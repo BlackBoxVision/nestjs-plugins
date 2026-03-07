@@ -1,5 +1,6 @@
 import { DynamicModule, Module, Provider, Type } from '@nestjs/common';
-import { BullModule } from '@nestjs/bullmq';
+import { BullModule, getQueueToken } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import {
   NOTIFICATION_MODULE_OPTIONS,
   EMAIL_PROVIDER,
@@ -200,6 +201,58 @@ export class NotificationModule {
             return null;
           }
           return this.instantiatePushProvider(pushConfig);
+        },
+        inject: [NOTIFICATION_MODULE_OPTIONS],
+      },
+      // Conditional BullMQ queue providers — creates Queue instances only
+      // when the channel is enabled and Redis config is present.
+      // We avoid BullModule.registerQueueAsync here to prevent @Processor
+      // workers from being created for disabled channels.
+      {
+        provide: getQueueToken('notifications-email'),
+        useFactory: (options: NotificationModuleOptions) => {
+          if (!options.channels.email?.enabled || !options.queue?.redis) {
+            return null;
+          }
+          return new Queue('notifications-email', {
+            connection: {
+              host: options.queue.redis.host,
+              port: options.queue.redis.port ?? 6379,
+              password: options.queue.redis.password,
+            },
+          });
+        },
+        inject: [NOTIFICATION_MODULE_OPTIONS],
+      },
+      {
+        provide: getQueueToken('notifications-sms'),
+        useFactory: (options: NotificationModuleOptions) => {
+          if (!options.channels.sms?.enabled || !options.queue?.redis) {
+            return null;
+          }
+          return new Queue('notifications-sms', {
+            connection: {
+              host: options.queue.redis.host,
+              port: options.queue.redis.port ?? 6379,
+              password: options.queue.redis.password,
+            },
+          });
+        },
+        inject: [NOTIFICATION_MODULE_OPTIONS],
+      },
+      {
+        provide: getQueueToken('notifications-push'),
+        useFactory: (options: NotificationModuleOptions) => {
+          if (!options.channels.push?.enabled || !options.queue?.redis) {
+            return null;
+          }
+          return new Queue('notifications-push', {
+            connection: {
+              host: options.queue.redis.host,
+              port: options.queue.redis.port ?? 6379,
+              password: options.queue.redis.password,
+            },
+          });
         },
         inject: [NOTIFICATION_MODULE_OPTIONS],
       },

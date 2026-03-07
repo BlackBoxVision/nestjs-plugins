@@ -14,6 +14,9 @@ jest.mock('./channels/push/providers/firebase.provider', () => ({
     .fn()
     .mockImplementation(() => ({ send: jest.fn() })),
 }));
+jest.mock('bullmq', () => ({
+  Queue: jest.fn().mockImplementation(() => ({})),
+}));
 jest.mock('@nestjs/bullmq', () => ({
   BullModule: {
     registerQueue: jest.fn().mockReturnValue({
@@ -25,6 +28,7 @@ jest.mock('@nestjs/bullmq', () => ({
   InjectQueue: () => () => {},
   Processor: () => () => {},
   WorkerHost: class WorkerHost {},
+  getQueueToken: (name: string) => `BullQueue_${name}`,
 }));
 
 import { NotificationModule } from './notification.module';
@@ -314,6 +318,9 @@ describe('NotificationModule', () => {
       expect(providerTokens).toContain(EMAIL_PROVIDER);
       expect(providerTokens).toContain(SMS_PROVIDER);
       expect(providerTokens).toContain(PUSH_PROVIDER);
+      expect(providerTokens).toContain('BullQueue_notifications-email');
+      expect(providerTokens).toContain('BullQueue_notifications-sms');
+      expect(providerTokens).toContain('BullQueue_notifications-push');
 
       expect(result.controllers).toContain(InAppController);
       expect(result.controllers).toContain(DeviceTokenController);
