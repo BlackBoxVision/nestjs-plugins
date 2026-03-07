@@ -145,7 +145,7 @@ export class NotificationModule {
       ), ...(
         options.features?.templates !== false ? [TemplateService] : []
       )],
-      global: false,
+      global: options.isGlobal ?? false,
     };
   }
 
@@ -220,7 +220,7 @@ export class NotificationModule {
         PreferenceService,
         TemplateService,
       ],
-      global: false,
+      global: asyncOptions.isGlobal ?? false,
     };
   }
 

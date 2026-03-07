@@ -42,6 +42,12 @@ export {
   PUSH_PROVIDER,
 } from './interfaces';
 
+// Auth integration
+export { AuthNotificationModule } from './integrations/auth';
+export { AuthNotificationListener } from './integrations/auth';
+export { AUTH_NOTIFICATION_CONFIG } from './integrations/auth';
+export type { AuthNotificationConfig, AuthNotificationAsyncOptions } from './integrations/auth';
+
 export type {
   EmailProvider,
   EmailSendOptions,

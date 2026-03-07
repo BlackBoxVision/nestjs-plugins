@@ -144,10 +144,12 @@ export interface NotificationModuleOptions {
   queue?: {
     redis: { host: string; port?: number; password?: string };
   };
+  isGlobal?: boolean;
 }
 
 export interface NotificationModuleAsyncOptions {
   imports?: any[];
+  isGlobal?: boolean;
   useFactory: (
     ...args: any[]
   ) => Promise<NotificationModuleOptions> | NotificationModuleOptions;

@@ -6,7 +6,7 @@
   "types": "dist/index.d.ts",
   "files": ["dist", "prisma"],
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && cp -r src/templates/defaults dist/templates/",
     "dev": "tsc --watch",
     "lint": "eslint src/ --ext .ts",
     "lint:fix": "eslint src/ --ext .ts --fix",
@@ -22,9 +22,13 @@
     "@nestjs/bullmq": "^10.0.0",
     "@prisma/client": "^5.0.0 || ^6.0.0",
     "bullmq": "^5.0.0",
+    "@nestjs/event-emitter": "^2.0.0 || ^3.0.0",
     "firebase-admin": "^12.0.0 || ^13.0.0"
   },
   "peerDependenciesMeta": {
+    "@nestjs/event-emitter": {
+      "optional": true
+    },
     "firebase-admin": {
       "optional": true
     }
@@ -39,6 +43,7 @@
     "@nestjs/bullmq": "^10.2.0",
     "@nestjs/testing": "^10.0.0",
     "@prisma/client": "^6.0.0",
+    "@nestjs/event-emitter": "^2.1.0",
     "@types/jest": "^29.5.0",
     "@types/nodemailer": "^6.4.14",
     "bullmq": "^5.0.0",
