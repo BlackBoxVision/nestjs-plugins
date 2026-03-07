@@ -1,46 +1,28 @@
-import { PaginatedResponseDto, PaginationMeta } from './paginated-response.dto';
+import { createPaginatedResponseDto } from './paginated-response.dto';
 
-describe('PaginatedResponseDto', () => {
-  it('should create paginated response with correct meta', () => {
-    const data = [{ id: '1' }, { id: '2' }];
-    const response = new PaginatedResponseDto(data, 50, 1, 20);
+class TestItemDto {
+  id: string;
+  name: string;
+}
 
-    expect(response.data).toEqual(data);
-    expect(response.meta.total).toBe(50);
-    expect(response.meta.page).toBe(1);
-    expect(response.meta.limit).toBe(20);
-    expect(response.meta.totalPages).toBe(3);
-    expect(response.meta.hasPreviousPage).toBe(false);
-    expect(response.meta.hasNextPage).toBe(true);
+describe('createPaginatedResponseDto', () => {
+  it('should create a schema class with the correct name', () => {
+    const SchemaClass = createPaginatedResponseDto(TestItemDto);
+    expect(SchemaClass.name).toBe('PaginatedTestItemDtoResponse');
   });
 
-  it('should indicate last page correctly', () => {
-    const response = new PaginatedResponseDto([], 50, 3, 20);
-
-    expect(response.meta.hasPreviousPage).toBe(true);
-    expect(response.meta.hasNextPage).toBe(false);
+  it('should be instantiable', () => {
+    const SchemaClass = createPaginatedResponseDto(TestItemDto);
+    const instance = new SchemaClass();
+    expect(instance).toBeDefined();
   });
 
-  it('should handle single page', () => {
-    const response = new PaginatedResponseDto([{ id: '1' }], 1, 1, 20);
+  it('should work with different DTO classes', () => {
+    class AnotherDto {
+      title: string;
+    }
 
-    expect(response.meta.totalPages).toBe(1);
-    expect(response.meta.hasPreviousPage).toBe(false);
-    expect(response.meta.hasNextPage).toBe(false);
-  });
-
-  it('should handle empty results', () => {
-    const response = new PaginatedResponseDto([], 0, 1, 20);
-
-    expect(response.meta.totalPages).toBe(0);
-    expect(response.meta.hasPreviousPage).toBe(false);
-    expect(response.meta.hasNextPage).toBe(false);
-  });
-});
-
-describe('PaginationMeta', () => {
-  it('should calculate totalPages correctly', () => {
-    const meta = new PaginationMeta(55, 1, 20);
-    expect(meta.totalPages).toBe(3);
+    const SchemaClass = createPaginatedResponseDto(AnotherDto);
+    expect(SchemaClass.name).toBe('PaginatedAnotherDtoResponse');
   });
 });

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@bbv/nestjs-prisma';
-import { PaginationDto, PaginatedResponseDto, paginate } from '@bbv/nestjs-pagination';
+import { PaginationDto, PaginatedApiResponse, paginate } from '@bbv/nestjs-pagination';
 
 export interface Item {
   id: string;
@@ -25,11 +25,10 @@ export class ItemsService {
     };
   }
 
-  async findAll(pagination: PaginationDto): Promise<PaginatedResponseDto<Item>> {
+  async findAll(pagination: PaginationDto): Promise<PaginatedApiResponse<Item>> {
     return paginate<Item>({
       model: this.itemModel,
       pagination,
-      orderBy: { createdAt: 'desc' },
     });
   }
 

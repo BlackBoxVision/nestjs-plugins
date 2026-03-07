@@ -1,5 +1,5 @@
 import { TransformInterceptor } from './transform.interceptor';
-import { ApiResponse } from './api-response';
+import { ApiResponse, PaginatedApiResponse } from './api-response';
 import { of, lastValueFrom } from 'rxjs';
 
 describe('TransformInterceptor', () => {
@@ -24,7 +24,7 @@ describe('TransformInterceptor', () => {
     expect(result).toBeInstanceOf(ApiResponse);
     expect(result.success).toBe(true);
     expect(result.data).toEqual(data);
-    expect(result.timestamp).toBeDefined();
+    expect(result.errors).toBeNull();
   });
 
   it('should wrap null data in ApiResponse.ok()', async () => {
@@ -44,11 +44,10 @@ describe('TransformInterceptor', () => {
 
     expect(result).toBeInstanceOf(ApiResponse);
     expect(result.success).toBe(true);
-    expect(result.data).toBeUndefined();
   });
 
   it('should pass through data that is already an ApiResponse instance', async () => {
-    const existing = ApiResponse.ok({ id: '42' }, 'Already wrapped');
+    const existing = ApiResponse.ok({ id: '42' });
     const result = await lastValueFrom(
       interceptor.intercept(mockExecutionContext, createCallHandler(existing)),
     );
@@ -56,7 +55,15 @@ describe('TransformInterceptor', () => {
     expect(result).toBe(existing);
     expect(result.success).toBe(true);
     expect(result.data).toEqual({ id: '42' });
-    expect(result.message).toBe('Already wrapped');
+  });
+
+  it('should pass through PaginatedApiResponse instances', async () => {
+    const existing = PaginatedApiResponse.paginated([{ id: '1' }], 1, 0, 10);
+    const result = await lastValueFrom(
+      interceptor.intercept(mockExecutionContext, createCallHandler(existing)),
+    );
+
+    expect(result).toBe(existing);
   });
 
   it('should wrap string data in ApiResponse.ok()', async () => {

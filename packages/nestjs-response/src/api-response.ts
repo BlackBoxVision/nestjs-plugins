@@ -1,23 +1,43 @@
+export type ApiErrors = Record<string, string[]>;
+
 export class ApiResponse<T> {
   success: boolean;
-  data: T;
-  message?: string;
-  timestamp: string;
+  data: T | null;
+  errors: ApiErrors | null;
 
-  constructor(data: T, message?: string) {
-    this.success = true;
+  constructor(success: boolean, data: T | null, errors: ApiErrors | null) {
+    this.success = success;
     this.data = data;
-    this.message = message;
-    this.timestamp = new Date().toISOString();
+    this.errors = errors;
   }
 
-  static ok<T>(data: T, message?: string): ApiResponse<T> {
-    return new ApiResponse(data, message);
+  static ok<T>(data: T): ApiResponse<T> {
+    return new ApiResponse(true, data, null);
   }
 
-  static error<T = null>(message: string, data?: T): ApiResponse<T | null> {
-    const response = new ApiResponse<T | null>(data ?? null, message);
-    response.success = false;
-    return response;
+  static error(errors: ApiErrors): ApiResponse<null> {
+    return new ApiResponse(false, null, errors);
+  }
+}
+
+export class PaginatedApiResponse<T> extends ApiResponse<T[]> {
+  total: number;
+  page: number;
+  limit: number;
+
+  constructor(data: T[], total: number, page: number, limit: number) {
+    super(true, data, null);
+    this.total = total;
+    this.page = page;
+    this.limit = limit;
+  }
+
+  static paginated<T>(
+    data: T[],
+    total: number,
+    page: number,
+    limit: number,
+  ): PaginatedApiResponse<T> {
+    return new PaginatedApiResponse(data, total, page, limit);
   }
 }

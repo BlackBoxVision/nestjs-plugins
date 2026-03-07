@@ -1,5 +1,5 @@
-import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { NestFactory, Reflector } from '@nestjs/core';
+import { ClassSerializerInterceptor, ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { TransformInterceptor, HttpExceptionFilter } from '@bbv/nestjs-response';
@@ -15,7 +15,10 @@ async function bootstrap() {
     }),
   );
 
-  app.useGlobalInterceptors(new TransformInterceptor());
+  app.useGlobalInterceptors(
+    new ClassSerializerInterceptor(app.get(Reflector)),
+    new TransformInterceptor(),
+  );
   app.useGlobalFilters(new HttpExceptionFilter());
 
   const config = new DocumentBuilder()

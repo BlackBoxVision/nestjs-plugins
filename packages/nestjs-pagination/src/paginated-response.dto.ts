@@ -1,43 +1,30 @@
+import { Type } from '@nestjs/common';
 import { ApiProperty } from '@nestjs/swagger';
 
-export class PaginationMeta {
-  @ApiProperty()
-  total: number;
+export function createPaginatedResponseDto<T extends Type>(classRef: T) {
+  class PaginatedResponseSchema {
+    @ApiProperty({ type: Boolean })
+    success!: boolean;
 
-  @ApiProperty()
-  page: number;
+    @ApiProperty({ type: [classRef] })
+    data!: InstanceType<T>[];
 
-  @ApiProperty()
-  limit: number;
+    @ApiProperty({ type: Object, nullable: true })
+    errors!: Record<string, string[]> | null;
 
-  @ApiProperty()
-  totalPages: number;
+    @ApiProperty({ type: Number })
+    total!: number;
 
-  @ApiProperty()
-  hasPreviousPage: boolean;
+    @ApiProperty({ type: Number })
+    page!: number;
 
-  @ApiProperty()
-  hasNextPage: boolean;
-
-  constructor(total: number, page: number, limit: number) {
-    this.total = total;
-    this.page = page;
-    this.limit = limit;
-    this.totalPages = Math.ceil(total / limit);
-    this.hasPreviousPage = page > 1;
-    this.hasNextPage = page < this.totalPages;
+    @ApiProperty({ type: Number })
+    limit!: number;
   }
-}
 
-export class PaginatedResponseDto<T> {
-  @ApiProperty({ isArray: true })
-  data: T[];
+  Object.defineProperty(PaginatedResponseSchema, 'name', {
+    value: `Paginated${classRef.name}Response`,
+  });
 
-  @ApiProperty({ type: PaginationMeta })
-  meta: PaginationMeta;
-
-  constructor(data: T[], total: number, page: number, limit: number) {
-    this.data = data;
-    this.meta = new PaginationMeta(total, page, limit);
-  }
+  return PaginatedResponseSchema;
 }

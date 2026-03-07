@@ -1,4 +1,4 @@
-import { PaginatedResponseDto } from './paginated-response.dto';
+import { PaginatedApiResponse } from '@bbv/nestjs-response';
 import { PaginationDto } from './pagination.dto';
 
 export interface PaginateOptions<TWhereInput> {
@@ -15,12 +15,15 @@ export interface PaginateOptions<TWhereInput> {
 
 export async function paginate<T, TWhereInput = Record<string, unknown>>(
   options: PaginateOptions<TWhereInput>,
-): Promise<PaginatedResponseDto<T>> {
+): Promise<PaginatedApiResponse<T>> {
   const { model, pagination, where, orderBy, include, select } = options;
+
+  const resolvedOrderBy = orderBy ?? { [pagination.sortBy]: pagination.sortOrder };
 
   const findManyArgs: Record<string, unknown> = {
     skip: pagination.skip,
     take: pagination.take,
+    orderBy: resolvedOrderBy,
   };
 
   const countArgs: Record<string, unknown> = {};
@@ -28,10 +31,6 @@ export async function paginate<T, TWhereInput = Record<string, unknown>>(
   if (where) {
     findManyArgs['where'] = where;
     countArgs['where'] = where;
-  }
-
-  if (orderBy) {
-    findManyArgs['orderBy'] = orderBy;
   }
 
   if (include) {
@@ -47,5 +46,10 @@ export async function paginate<T, TWhereInput = Record<string, unknown>>(
     model.count(countArgs),
   ]);
 
-  return new PaginatedResponseDto<T>(data as T[], total, pagination.page, pagination.limit);
+  return PaginatedApiResponse.paginated<T>(
+    data as T[],
+    total,
+    pagination.page,
+    pagination.limit,
+  );
 }

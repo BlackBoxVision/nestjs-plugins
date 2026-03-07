@@ -1,6 +1,6 @@
 import { paginate } from './paginate';
-import { PaginationDto } from './pagination.dto';
-import { PaginatedResponseDto } from './paginated-response.dto';
+import { PaginationDto, SortOrder } from './pagination.dto';
+import { PaginatedApiResponse } from '@bbv/nestjs-response';
 
 function createMockModel(data: any[] = [], total: number = 0) {
   return {
@@ -9,7 +9,7 @@ function createMockModel(data: any[] = [], total: number = 0) {
   };
 }
 
-function createPaginationDto(page = 1, limit = 20): PaginationDto {
+function createPaginationDto(page = 0, limit = 10): PaginationDto {
   const dto = new PaginationDto();
   dto.page = page;
   dto.limit = limit;
@@ -27,21 +27,21 @@ describe('paginate', () => {
     expect(model.count).toHaveBeenCalledTimes(1);
   });
 
-  it('should apply skip and take correctly from pagination dto', async () => {
+  it('should apply skip and take correctly from 0-based pagination dto', async () => {
     const model = createMockModel([], 0);
-    const pagination = createPaginationDto(3, 10);
+    const pagination = createPaginationDto(2, 10);
 
     await paginate({ model, pagination });
 
     expect(model.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        skip: 20, // (3-1) * 10
+        skip: 20, // 2 * 10
         take: 10,
       }),
     );
   });
 
-  it('should use default page=1 and limit=20 when not specified', async () => {
+  it('should use default page=0 and limit=10 when not specified', async () => {
     const model = createMockModel([], 0);
     const pagination = createPaginationDto();
 
@@ -49,8 +49,50 @@ describe('paginate', () => {
 
     expect(model.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        skip: 0, // (1-1) * 20
-        take: 20,
+        skip: 0, // 0 * 10
+        take: 10,
+      }),
+    );
+  });
+
+  it('should auto-build orderBy from pagination sortBy and sortOrder', async () => {
+    const model = createMockModel([], 0);
+    const pagination = createPaginationDto();
+    pagination.sortBy = 'name';
+    pagination.sortOrder = SortOrder.ASC;
+
+    await paginate({ model, pagination });
+
+    expect(model.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderBy: { name: 'asc' },
+      }),
+    );
+  });
+
+  it('should use default sortBy=createdAt and sortOrder=desc', async () => {
+    const model = createMockModel([], 0);
+    const pagination = createPaginationDto();
+
+    await paginate({ model, pagination });
+
+    expect(model.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderBy: { createdAt: 'desc' },
+      }),
+    );
+  });
+
+  it('should use explicit orderBy option over pagination sort fields', async () => {
+    const model = createMockModel([], 0);
+    const pagination = createPaginationDto();
+    const orderBy = { updatedAt: 'asc' as const };
+
+    await paginate({ model, pagination, orderBy });
+
+    expect(model.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderBy: { updatedAt: 'asc' },
       }),
     );
   });
@@ -70,18 +112,14 @@ describe('paginate', () => {
     );
   });
 
-  it('should pass orderBy to findMany only, not to count', async () => {
+  it('should not pass orderBy to count', async () => {
     const model = createMockModel([], 0);
     const pagination = createPaginationDto();
-    const orderBy = { createdAt: 'desc' };
 
-    await paginate({ model, pagination, orderBy });
+    await paginate({ model, pagination });
 
-    expect(model.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ orderBy }),
-    );
     expect(model.count).toHaveBeenCalledWith(
-      expect.not.objectContaining({ orderBy }),
+      expect.not.objectContaining({ orderBy: expect.anything() }),
     );
   });
 
@@ -115,63 +153,41 @@ describe('paginate', () => {
     );
   });
 
-  it('should return PaginatedResponseDto with correct data and meta', async () => {
+  it('should return PaginatedApiResponse with correct data and flat pagination fields', async () => {
     const items = [{ id: 1, name: 'Item 1' }, { id: 2, name: 'Item 2' }];
     const model = createMockModel(items, 50);
-    const pagination = createPaginationDto(2, 10);
-
-    const result = await paginate({ model, pagination });
-
-    expect(result).toBeInstanceOf(PaginatedResponseDto);
-    expect(result.data).toEqual(items);
-    expect(result.meta.total).toBe(50);
-    expect(result.meta.page).toBe(2);
-    expect(result.meta.limit).toBe(10);
-    expect(result.meta.totalPages).toBe(5); // ceil(50/10)
-  });
-
-  it('should return empty data and totalPages 0 when there are 0 results', async () => {
-    const model = createMockModel([], 0);
     const pagination = createPaginationDto(1, 10);
 
     const result = await paginate({ model, pagination });
 
-    expect(result).toBeInstanceOf(PaginatedResponseDto);
+    expect(result).toBeInstanceOf(PaginatedApiResponse);
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual(items);
+    expect(result.errors).toBeNull();
+    expect(result.total).toBe(50);
+    expect(result.page).toBe(1);
+    expect(result.limit).toBe(10);
+  });
+
+  it('should return empty data when there are 0 results', async () => {
+    const model = createMockModel([], 0);
+    const pagination = createPaginationDto(0, 10);
+
+    const result = await paginate({ model, pagination });
+
+    expect(result).toBeInstanceOf(PaginatedApiResponse);
     expect(result.data).toEqual([]);
-    expect(result.meta.total).toBe(0);
-    expect(result.meta.page).toBe(1);
-    expect(result.meta.limit).toBe(10);
-    expect(result.meta.totalPages).toBe(0);
-  });
-
-  it('should calculate totalPages correctly on exact page boundary', async () => {
-    const items = Array.from({ length: 20 }, (_, i) => ({ id: i + 1 }));
-    const model = createMockModel(items, 40);
-    const pagination = createPaginationDto(1, 20);
-
-    const result = await paginate({ model, pagination });
-
-    expect(result.meta.total).toBe(40);
-    expect(result.meta.limit).toBe(20);
-    expect(result.meta.totalPages).toBe(2); // ceil(40/20) = 2
-  });
-
-  it('should calculate totalPages correctly when not on exact boundary', async () => {
-    const items = [{ id: 1 }];
-    const model = createMockModel(items, 41);
-    const pagination = createPaginationDto(1, 20);
-
-    const result = await paginate({ model, pagination });
-
-    expect(result.meta.totalPages).toBe(3); // ceil(41/20) = 3
+    expect(result.total).toBe(0);
+    expect(result.page).toBe(0);
+    expect(result.limit).toBe(10);
   });
 
   it('should pass all combined options correctly', async () => {
     const items = [{ id: 1, title: 'Post 1' }];
     const model = createMockModel(items, 100);
-    const pagination = createPaginationDto(2, 5);
+    const pagination = createPaginationDto(1, 5);
     const where = { published: true };
-    const orderBy = { createdAt: 'desc' };
+    const orderBy = { createdAt: 'desc' as const };
     const include = { author: true, comments: true };
     const select = { id: true, title: true };
 
@@ -184,9 +200,8 @@ describe('paginate', () => {
       select,
     });
 
-    // findMany receives all options
     expect(model.findMany).toHaveBeenCalledWith({
-      skip: 5, // (2-1) * 5
+      skip: 5, // 1 * 5
       take: 5,
       where,
       orderBy,
@@ -194,15 +209,12 @@ describe('paginate', () => {
       select,
     });
 
-    // count receives only where
     expect(model.count).toHaveBeenCalledWith({ where });
 
-    // Response is correct
     expect(result.data).toEqual(items);
-    expect(result.meta.total).toBe(100);
-    expect(result.meta.page).toBe(2);
-    expect(result.meta.limit).toBe(5);
-    expect(result.meta.totalPages).toBe(20); // ceil(100/5)
+    expect(result.total).toBe(100);
+    expect(result.page).toBe(1);
+    expect(result.limit).toBe(5);
   });
 
   it('should not pass where to findMany or count when not provided', async () => {
@@ -218,7 +230,7 @@ describe('paginate', () => {
     expect(countCall).not.toHaveProperty('where');
   });
 
-  it('should not pass orderBy, include, or select when not provided', async () => {
+  it('should not pass include or select when not provided', async () => {
     const model = createMockModel([], 0);
     const pagination = createPaginationDto();
 
@@ -226,7 +238,6 @@ describe('paginate', () => {
 
     const findManyCall = model.findMany.mock.calls[0][0];
 
-    expect(findManyCall).not.toHaveProperty('orderBy');
     expect(findManyCall).not.toHaveProperty('include');
     expect(findManyCall).not.toHaveProperty('select');
   });

@@ -17,6 +17,7 @@
     "clean": "rm -rf dist coverage"
   },
   "peerDependencies": {
+    "@bbv/nestjs-response": "^0.0.1",
     "@nestjs/common": "^10.0.0",
     "@nestjs/swagger": "^7.0.0"
   },
@@ -25,6 +26,7 @@
     "class-transformer": "^0.5.1"
   },
   "devDependencies": {
+    "@bbv/nestjs-response": "^0.0.1",
     "@nestjs/common": "^10.0.0",
     "@nestjs/swagger": "^7.0.0",
     "@types/jest": "^29.5.0",

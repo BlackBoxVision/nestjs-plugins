@@ -25,7 +25,6 @@ describe('ApiPaginatedResponse', () => {
         }
       }
 
-      // Ensure the class is instantiable
       const controller = new TestController();
       expect(controller.findAll()).toEqual([]);
     }).not.toThrow();
@@ -53,7 +52,6 @@ describe('ApiPaginatedResponse', () => {
     const controller = new TestController();
     const metadata = Reflect.getMetadataKeys(controller.findAll);
 
-    // The decorator should have applied some Swagger metadata keys
     expect(metadata).toBeDefined();
   });
 });
