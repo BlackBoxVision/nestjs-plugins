@@ -23,6 +23,23 @@ for i in $(seq 1 30); do
   sleep 1
 done
 
+echo "==> Waiting for MinIO and creating bucket..."
+for i in $(seq 1 15); do
+  if curl -sf http://localhost:9004/minio/health/live > /dev/null 2>&1; then
+    echo "    MinIO is ready."
+    break
+  fi
+  if [ "$i" -eq 15 ]; then
+    echo "    WARNING: MinIO health check failed, continuing anyway..."
+  fi
+  sleep 1
+done
+
+# Create the demo-uploads bucket via mc inside the minio container
+docker compose exec -T minio sh -c \
+  'mc alias set local http://localhost:9000 minioadmin minioadmin 2>/dev/null && mc mb --ignore-existing local/demo-uploads 2>/dev/null' \
+  || echo "    WARNING: Could not create MinIO bucket (may already exist)"
+
 echo "==> Pushing Prisma schema to database..."
 npx prisma db push --skip-generate --accept-data-loss 2>&1
 

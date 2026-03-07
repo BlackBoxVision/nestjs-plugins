@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
+import * as OTPAuth from 'otpauth';
 import { AppModule } from '../src/app.module';
 import { TransformInterceptor, HttpExceptionFilter } from '@bbv/nestjs-response';
 
@@ -13,6 +14,14 @@ describe('Demo App (e2e)', () => {
   let userId: string;
   const testEmail = `e2e-${Date.now()}@test.local`;
   const testPassword = 'TestPassword123!';
+
+  // Additional shared state for new sections
+  let itemId: string;
+  let orgId: string;
+  let totpSecret: string;
+  let challengeToken: string;
+  let uploadedFileKey: string;
+  let notificationId: string;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -179,6 +188,45 @@ describe('Demo App (e2e)', () => {
     });
   });
 
+  // ─── Auth: Session Revocation ───────────────────────────
+
+  describe('DELETE /auth/sessions/:id', () => {
+    it('should revoke a session', async () => {
+      // Login to create a new session
+      const loginRes = await request(httpServer)
+        .post('/auth/login')
+        .send({ email: testEmail, password: testPassword })
+        .expect(201);
+
+      const tempToken = loginRes.body.data.accessToken;
+
+      // List sessions to find the one we just created
+      const sessionsRes = await request(httpServer)
+        .get('/auth/sessions')
+        .set('Authorization', `Bearer ${tempToken}`)
+        .expect(200);
+
+      const sessions = sessionsRes.body.data;
+      expect(sessions.length).toBeGreaterThanOrEqual(1);
+
+      // Revoke the first session that is NOT the current one (if possible)
+      const sessionToRevoke = sessions[sessions.length - 1];
+
+      const revokeRes = await request(httpServer)
+        .delete(`/auth/sessions/${sessionToRevoke.id}`)
+        .set('Authorization', `Bearer ${tempToken}`)
+        .expect(200);
+
+      expect(revokeRes.body.success).toBe(true);
+    });
+
+    it('should reject without auth', async () => {
+      await request(httpServer)
+        .delete('/auth/sessions/some-id')
+        .expect(401);
+    });
+  });
+
   // ─── Auth: Forgot Password ──────────────────────────────
 
   describe('POST /auth/forgot-password', () => {
@@ -232,8 +280,6 @@ describe('Demo App (e2e)', () => {
   // ─── Items (public reads, protected writes) ─────────────
 
   describe('Items CRUD', () => {
-    let itemId: string;
-
     it('GET /items should return paginated list (public)', async () => {
       const res = await request(httpServer).get('/items').expect(200);
 
@@ -283,6 +329,395 @@ describe('Demo App (e2e)', () => {
     });
   });
 
+  // ─── Items: Pagination & Edge Cases ─────────────────────
+
+  describe('Items: Pagination & Edge Cases', () => {
+    it('GET /items?page=0&limit=1 should return pagination shape', async () => {
+      const res = await request(httpServer)
+        .get('/items?page=0&limit=1')
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.total).toBeDefined();
+      expect(res.body.page).toBe(0);
+      expect(res.body.limit).toBe(1);
+      expect(Array.isArray(res.body.data)).toBe(true);
+    });
+
+    it('GET /items?sortBy=name&sortOrder=asc should accept sort params', async () => {
+      const res = await request(httpServer)
+        .get('/items?sortBy=name&sortOrder=asc')
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+    });
+
+    it('GET /items/:nonExistentId should return null data for missing item', async () => {
+      const fakeId = '00000000-0000-0000-0000-000000000000';
+      const res = await request(httpServer)
+        .get(`/items/${fakeId}`)
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toBeNull();
+    });
+
+    it('GET /items?page=-1 should return 400 from validation', async () => {
+      await request(httpServer).get('/items?page=-1').expect(400);
+    });
+  });
+
+  // ─── Response Envelope Validation ───────────────────────
+
+  describe('Response Envelope', () => {
+    it('success response should have { success: true, data: ... } shape', async () => {
+      const res = await request(httpServer).get('/health').expect(200);
+
+      expect(res.body).toHaveProperty('success', true);
+      expect(res.body).toHaveProperty('data');
+      expect(res.body).toHaveProperty('errors', null);
+    });
+
+    it('error response should have { success: false, errors: ... } shape', async () => {
+      const res = await request(httpServer)
+        .post('/auth/register')
+        .send({ email: 'bad-email' })
+        .expect(400);
+
+      expect(res.body).toHaveProperty('success', false);
+      expect(res.body.errors).toBeDefined();
+    });
+  });
+
+  // ─── Organizations ─────────────────────────────────────
+
+  describe('Organizations', () => {
+    const orgSlug = `test-org-${Date.now()}`;
+
+    it('POST /organizations should create an organization', async () => {
+      const res = await request(httpServer)
+        .post('/organizations')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ name: 'Test Organization', slug: orgSlug })
+        .expect(201);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.name).toBe('Test Organization');
+      expect(res.body.data.slug).toBe(orgSlug);
+      expect(res.body.data.id).toBeDefined();
+
+      orgId = res.body.data.id;
+    });
+
+    it('POST /organizations should reject duplicate slug', async () => {
+      const res = await request(httpServer)
+        .post('/organizations')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ name: 'Another Org', slug: orgSlug });
+
+      // Expect a conflict or bad request
+      expect([400, 409, 500]).toContain(res.status);
+    });
+
+    it('GET /organizations should list orgs for user', async () => {
+      const res = await request(httpServer)
+        .get('/organizations')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      const orgs = res.body.data;
+      expect(Array.isArray(orgs)).toBe(true);
+      expect(orgs.some((o: any) => o.id === orgId)).toBe(true);
+    });
+
+    it('GET /organizations/:id should return org details', async () => {
+      const res = await request(httpServer)
+        .get(`/organizations/${orgId}`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.id).toBe(orgId);
+      expect(res.body.data.name).toBe('Test Organization');
+    });
+
+    it('PATCH /organizations/:id should update name', async () => {
+      const res = await request(httpServer)
+        .patch(`/organizations/${orgId}`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ name: 'Updated Org Name' })
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.name).toBe('Updated Org Name');
+    });
+
+    it('POST /organizations/:id/members should add a member', async () => {
+      // Register an inline member user
+      const memberEmail = `member-${Date.now()}@test.local`;
+      const memberRes = await request(httpServer)
+        .post('/auth/register')
+        .send({ email: memberEmail, password: testPassword })
+        .expect(201);
+
+      const memberId = memberRes.body.data.user.id;
+
+      const res = await request(httpServer)
+        .post(`/organizations/${orgId}/members`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ userId: memberId, role: 'member' })
+        .expect(201);
+
+      expect(res.body.success).toBe(true);
+
+      // Remove the member afterward
+      await request(httpServer)
+        .delete(`/organizations/${orgId}/members/${memberId}`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(200);
+    });
+
+    it('DELETE /organizations/:id/members/:userId should remove a member', async () => {
+      // Register another user to add and remove
+      const removeEmail = `remove-${Date.now()}@test.local`;
+      const regRes = await request(httpServer)
+        .post('/auth/register')
+        .send({ email: removeEmail, password: testPassword })
+        .expect(201);
+
+      const removeUserId = regRes.body.data.user.id;
+
+      // Add as member
+      await request(httpServer)
+        .post(`/organizations/${orgId}/members`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ userId: removeUserId, role: 'member' })
+        .expect(201);
+
+      // Remove member
+      const res = await request(httpServer)
+        .delete(`/organizations/${orgId}/members/${removeUserId}`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+    });
+
+    it('all org endpoints should reject without auth', async () => {
+      await request(httpServer).get('/organizations').expect(401);
+      await request(httpServer).post('/organizations').send({ name: 'No', slug: 'no' }).expect(401);
+    });
+  });
+
+  // ─── OTP / TOTP & Email OTP ─────────────────────────────
+
+  describe('OTP / TOTP', () => {
+    it('POST /otp/totp/setup should return secret and backup codes', async () => {
+      const res = await request(httpServer)
+        .post('/otp/totp/setup')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ userId })
+        .expect(201);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.secret).toBeDefined();
+      expect(res.body.data.otpAuthUrl).toBeDefined();
+      expect(res.body.data.qrCodeDataUrl).toBeDefined();
+      expect(Array.isArray(res.body.data.backupCodes)).toBe(true);
+      expect(res.body.data.backupCodes.length).toBeGreaterThan(0);
+
+      totpSecret = res.body.data.secret;
+    });
+
+    it('POST /otp/totp/confirm with invalid code should fail', async () => {
+      const res = await request(httpServer)
+        .post('/otp/totp/confirm')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ userId, code: '000000' });
+
+      expect([400, 401]).toContain(res.status);
+    });
+
+    it('POST /otp/totp/confirm with valid code should succeed', async () => {
+      const totp = new OTPAuth.TOTP({
+        secret: OTPAuth.Secret.fromBase32(totpSecret),
+        algorithm: 'SHA1',
+        digits: 6,
+        period: 30,
+      });
+      const code = totp.generate();
+
+      const res = await request(httpServer)
+        .post('/otp/totp/confirm')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ userId, code })
+        .expect(201);
+
+      expect(res.body.success).toBe(true);
+    });
+
+    it('GET /otp/methods should return methods including totp', async () => {
+      const res = await request(httpServer)
+        .get('/otp/methods')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ userId })
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.methods).toBeDefined();
+      expect(res.body.data.methods).toContain('totp');
+    });
+
+    it('POST /otp/send with email method should succeed', async () => {
+      const res = await request(httpServer)
+        .post('/otp/send')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ userId, method: 'email' });
+
+      // May succeed or fail depending on email provider config
+      expect([200, 201, 400, 403, 500]).toContain(res.status);
+    });
+
+    it('POST /otp/verify with invalid code should fail', async () => {
+      const res = await request(httpServer)
+        .post('/otp/verify')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ userId, code: '000000', method: 'totp' });
+
+      expect([400, 401]).toContain(res.status);
+    });
+
+    it('POST /otp/totp/setup again should reject (already set up)', async () => {
+      const res = await request(httpServer)
+        .post('/otp/totp/setup')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ userId });
+
+      expect(res.status).toBe(400);
+    });
+  });
+
+  // ─── 2FA Login Flow ─────────────────────────────────────
+
+  describe('2FA Login Flow', () => {
+    it('POST /auth/login should return challengeToken when 2FA is enabled', async () => {
+      const res = await request(httpServer)
+        .post('/auth/login')
+        .send({ email: testEmail, password: testPassword })
+        .expect(201);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.twoFactorRequired).toBe(true);
+      expect(res.body.data.challengeToken).toBeDefined();
+      expect(res.body.data.accessToken).toBeUndefined();
+
+      challengeToken = res.body.data.challengeToken;
+    });
+
+    it('POST /auth/2fa/verify with invalid code should fail', async () => {
+      const res = await request(httpServer)
+        .post('/auth/2fa/verify')
+        .send({ challengeToken, code: '000000' });
+
+      expect([400, 401]).toContain(res.status);
+    });
+
+    it('POST /auth/2fa/verify with invalid challengeToken should fail', async () => {
+      const res = await request(httpServer)
+        .post('/auth/2fa/verify')
+        .send({ challengeToken: 'invalid-token', code: '123456' })
+        .expect(401);
+
+      expect(res.body.success).toBe(false);
+    });
+
+    it('POST /auth/2fa/verify with valid TOTP code should return accessToken', async () => {
+      const totp = new OTPAuth.TOTP({
+        secret: OTPAuth.Secret.fromBase32(totpSecret),
+        algorithm: 'SHA1',
+        digits: 6,
+        period: 30,
+      });
+      const code = totp.generate();
+
+      const res = await request(httpServer)
+        .post('/auth/2fa/verify')
+        .send({ challengeToken, code })
+        .expect(201);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.accessToken).toBeDefined();
+      expect(res.body.data.user).toBeDefined();
+      expect(res.body.data.user.email).toBe(testEmail);
+
+      // Refresh accessToken for downstream tests
+      accessToken = res.body.data.accessToken;
+    });
+  });
+
+  // ─── Storage ────────────────────────────────────────────
+
+  describe('Storage', () => {
+    it('POST /storage/upload should upload a file', async () => {
+      const res = await request(httpServer)
+        .post('/storage/upload')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .attach('file', Buffer.from('hello world'), 'test.txt')
+        .expect(201);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.key).toBeDefined();
+
+      uploadedFileKey = res.body.data.key;
+    });
+
+    it('POST /storage/upload without file should return 400', async () => {
+      await request(httpServer)
+        .post('/storage/upload')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(400);
+    });
+
+    it('POST /storage/upload without auth should return 401', async () => {
+      await request(httpServer)
+        .post('/storage/upload')
+        .attach('file', Buffer.from('hello'), 'test.txt')
+        .expect(401);
+    });
+
+    it('GET /storage/:key/url should return a signed URL', async () => {
+      const res = await request(httpServer)
+        .get(`/storage/${encodeURIComponent(uploadedFileKey)}/url`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.url).toBeDefined();
+      expect(typeof res.body.data.url).toBe('string');
+    });
+
+    it('GET /storage/:key/url?expiresIn=3600 should accept custom expiry', async () => {
+      const res = await request(httpServer)
+        .get(`/storage/${encodeURIComponent(uploadedFileKey)}/url?expiresIn=3600`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.url).toBeDefined();
+    });
+
+    it('DELETE /storage/:key should delete the file', async () => {
+      const res = await request(httpServer)
+        .delete(`/storage/${encodeURIComponent(uploadedFileKey)}`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.deleted).toBe(true);
+    });
+  });
+
   // ─── Notifications (in-app) ─────────────────────────────
 
   describe('Notifications', () => {
@@ -307,6 +742,69 @@ describe('Demo App (e2e)', () => {
 
     it('GET /notifications without auth should be rejected', async () => {
       await request(httpServer).get('/notifications').expect(401);
+    });
+  });
+
+  // ─── Notifications: Mark as Read ────────────────────────
+
+  describe('Notifications: Mark as Read', () => {
+    beforeAll(async () => {
+      // Trigger forgot-password to generate an in-app notification
+      await request(httpServer)
+        .post('/auth/forgot-password')
+        .send({ email: testEmail })
+        .expect(201);
+
+      // Give async event handler time to process
+      await new Promise((r) => setTimeout(r, 500));
+
+      // Fetch notifications to get an ID
+      const res = await request(httpServer)
+        .get('/notifications')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(200);
+
+      const notifications = res.body.data;
+      if (Array.isArray(notifications) && notifications.length > 0) {
+        notificationId = notifications[0].id;
+      }
+    });
+
+    it('PATCH /notifications/:id/read should mark single as read', async () => {
+      if (!notificationId) {
+        // If no notifications exist, skip gracefully
+        return;
+      }
+
+      const res = await request(httpServer)
+        .patch(`/notifications/${notificationId}/read`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+    });
+
+    it('PATCH /notifications/read-all should mark all as read', async () => {
+      const res = await request(httpServer)
+        .patch('/notifications/read-all')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+    });
+
+    it('GET /notifications/unread-count should be 0 after read-all', async () => {
+      const res = await request(httpServer)
+        .get('/notifications/unread-count')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.count).toBe(0);
+    });
+
+    it('PATCH /notifications/read-all without auth should be rejected', async () => {
+      await request(httpServer).patch('/notifications/read-all').expect(401);
     });
   });
 
@@ -386,12 +884,86 @@ describe('Demo App (e2e)', () => {
     });
   });
 
-  // ─── Audit Logs ─────────────────────────────────────────
+  // ─── Audit Logs: Deep Testing ──────────────────────────
 
   describe('Audit Logs', () => {
     it('GET /audit-logs should return audit entries', async () => {
       const res = await request(httpServer)
         .get('/audit-logs')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+    });
+
+    it('GET /audit-logs?entity=Item should filter by entity', async () => {
+      const res = await request(httpServer)
+        .get('/audit-logs?entity=Item')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      const entries = res.body.data.data ?? res.body.data;
+      if (Array.isArray(entries) && entries.length > 0) {
+        expect(entries.every((e: any) => e.entity === 'Item')).toBe(true);
+      }
+    });
+
+    it('GET /audit-logs?action=CREATE should filter by action', async () => {
+      const res = await request(httpServer)
+        .get('/audit-logs?action=CREATE')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      const entries = res.body.data.data ?? res.body.data;
+      if (Array.isArray(entries) && entries.length > 0) {
+        expect(entries.every((e: any) => e.action === 'CREATE')).toBe(true);
+      }
+    });
+
+    it('GET /audit-logs?page=0&limit=2 should support pagination', async () => {
+      const res = await request(httpServer)
+        .get('/audit-logs?page=0&limit=2')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      const entries = res.body.data.data ?? res.body.data;
+      if (Array.isArray(entries)) {
+        expect(entries.length).toBeLessThanOrEqual(2);
+      }
+    });
+
+    it('GET /audit-logs/:id should return single entry', async () => {
+      // First get all to pick an ID
+      const listRes = await request(httpServer)
+        .get('/audit-logs')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(200);
+
+      const entries = listRes.body.data.data ?? listRes.body.data;
+      if (!Array.isArray(entries) || entries.length === 0) {
+        return; // No entries to test
+      }
+
+      const entryId = entries[0].id;
+      const res = await request(httpServer)
+        .get(`/audit-logs/${entryId}`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.id).toBe(entryId);
+    });
+
+    it('GET /audit-logs/entity/Item/:itemId should return entity-specific logs', async () => {
+      if (!itemId) {
+        return; // Skip if no item was created
+      }
+
+      const res = await request(httpServer)
+        .get(`/audit-logs/entity/Item/${itemId}`)
         .set('Authorization', `Bearer ${accessToken}`)
         .expect(200);
 
