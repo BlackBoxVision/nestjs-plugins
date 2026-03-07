@@ -1,0 +1,46 @@
+model OtpSecret {
+  id              String   @id @default(cuid())
+  userId          String
+  method          String
+  encryptedSecret String
+  isActive        Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([userId, method])
+  @@index([userId])
+}
+
+model OtpBackupCode {
+  id        String    @id @default(cuid())
+  userId    String
+  codeHash  String
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+model OtpAttempt {
+  id        String   @id @default(cuid())
+  userId    String
+  method    String
+  success   Boolean
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  @@index([userId, method, createdAt])
+}
+
+model OtpCode {
+  id        String    @id @default(cuid())
+  userId    String
+  method    String
+  codeHash  String
+  context   String?
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, method])
+}

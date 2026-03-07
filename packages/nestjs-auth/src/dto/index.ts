@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class RegisterDto {
   @IsEmail()
@@ -53,4 +53,18 @@ export class ChangePasswordDto {
   @MinLength(8)
   @IsNotEmpty()
   newPassword!: string;
+}
+
+export class TwoFactorVerifyDto {
+  @IsString()
+  @IsNotEmpty()
+  challengeToken!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  code!: string;
+
+  @IsString()
+  @IsOptional()
+  method?: string;
 }

@@ -27,10 +27,20 @@ export {
   ResetPasswordDto,
   VerifyEmailDto,
   ChangePasswordDto,
+  TwoFactorVerifyDto,
 } from './dto';
 
+// Events
+export { AUTH_EVENTS } from './events';
+export type {
+  UserRegisteredEvent,
+  ForgotPasswordEvent,
+  PasswordResetEvent,
+  EmailVerifiedEvent,
+} from './events';
+
 // Interfaces & Constants
-export { AUTH_MODULE_OPTIONS } from './interfaces';
+export { AUTH_MODULE_OPTIONS, OTP_SERVICE } from './interfaces';
 export type {
   AuthModuleOptions,
   AuthModuleAsyncOptions,
@@ -41,4 +51,9 @@ export type {
   MicrosoftProviderConfig,
   JwtPayload,
   AuthenticatedUser,
+  TwoFactorConfig,
+  TwoFactorJwtConfig,
+  TwoFactorChallengePayload,
+  LoginResult,
+  TwoFactorChallengeResult,
 } from './interfaces';

@@ -1,9 +1,11 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { PrismaModule } from '@bbv/nestjs-prisma';
 import { AuthModule } from '@bbv/nestjs-auth';
+import { OtpModule } from '@bbv/nestjs-otp';
 import { StorageModule } from '@bbv/nestjs-storage';
-import { NotificationModule } from '@bbv/nestjs-notifications';
+import { NotificationModule, AuthNotificationModule } from '@bbv/nestjs-notifications';
 import { AuditLogModule } from '@bbv/nestjs-audit-log';
 import { AppController } from './app.controller';
 import { ItemsModule } from './items/items.module';
@@ -12,6 +14,8 @@ import * as path from 'path';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+
+    EventEmitterModule.forRoot(),
 
     PrismaModule.forRoot({ isGlobal: true }),
 
@@ -28,6 +32,14 @@ import * as path from 'path';
           emailVerification: true,
           passwordReset: true,
           sessionManagement: true,
+          twoFactor: true,
+        },
+        twoFactorJwt: {
+          challengeTokenSecret: config.get(
+            '2FA_CHALLENGE_SECRET',
+            config.getOrThrow('JWT_SECRET'),
+          ),
+          challengeTokenExpiresIn: '5m',
         },
         providers: {
           ...(config.get('GOOGLE_CLIENT_ID')
@@ -39,6 +51,40 @@ import * as path from 'path';
                 },
               }
             : {}),
+        },
+      }),
+      inject: [ConfigService],
+    }),
+
+    OtpModule.forRootAsync({
+      useFactory: (config: ConfigService) => ({
+        encryptionKey: config.get(
+          'OTP_ENCRYPTION_KEY',
+          'default-dev-encryption-key-change-in-prod',
+        ),
+        methods: {
+          totp: {
+            enabled: true,
+            method: 'totp' as const,
+            issuer: config.get('APP_NAME', 'Demo App'),
+          },
+          email: {
+            enabled: true,
+            method: 'email' as const,
+            codeLength: 6,
+            expiresInSeconds: 600,
+          },
+        },
+        features: {
+          totp: true,
+          emailOtp: true,
+          rateLimiting: true,
+          backupCodes: true,
+        },
+        rateLimiting: {
+          maxAttempts: 5,
+          windowSeconds: 300,
+          lockoutSeconds: 900,
         },
       }),
       inject: [ConfigService],
@@ -65,6 +111,7 @@ import * as path from 'path';
     }),
 
     NotificationModule.forRootAsync({
+      isGlobal: true,
       useFactory: (config: ConfigService) => ({
         channels: {
           email: {
@@ -89,6 +136,14 @@ import * as path from 'path';
             port: Number(config.get('REDIS_PORT', '6379')),
           },
         },
+      }),
+      inject: [ConfigService],
+    }),
+
+    AuthNotificationModule.forRootAsync({
+      useFactory: (config: ConfigService) => ({
+        baseUrl: config.get('APP_BASE_URL', 'http://localhost:3000'),
+        appName: config.get('APP_NAME', 'Demo App'),
       }),
       inject: [ConfigService],
     }),

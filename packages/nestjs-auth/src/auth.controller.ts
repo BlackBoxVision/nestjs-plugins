@@ -19,6 +19,7 @@ import {
   LoginDto,
   RegisterDto,
   ResetPasswordDto,
+  TwoFactorVerifyDto,
   VerifyEmailDto,
 } from './dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -69,6 +70,16 @@ export class AuthController {
       accessToken: profile.accessToken,
       refreshToken: profile.refreshToken,
     });
+  }
+
+  @Public()
+  @Post('2fa/verify')
+  async verifyTwoFactor(@Body() dto: TwoFactorVerifyDto) {
+    return this.authService.verifyTwoFactor(
+      dto.challengeToken,
+      dto.code,
+      dto.method,
+    );
   }
 
   @Public()

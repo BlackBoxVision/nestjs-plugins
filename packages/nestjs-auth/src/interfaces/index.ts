@@ -34,9 +34,21 @@ export interface AuthFeatures {
   organizations?: boolean;
   emailVerification?: boolean;
   passwordReset?: boolean;
-  twoFactor?: boolean;
+  twoFactor?: boolean | TwoFactorConfig;
   sessionManagement?: boolean;
   accountLinking?: boolean;
+}
+
+export interface TwoFactorConfig {
+  enabled: boolean;
+  methods?: string[];
+  enforced?: boolean;
+  gracePeriodDays?: number;
+}
+
+export interface TwoFactorJwtConfig {
+  challengeTokenSecret?: string;
+  challengeTokenExpiresIn?: string;
 }
 
 export interface AuthModuleOptions {
@@ -49,6 +61,7 @@ export interface AuthModuleOptions {
   };
   passwordHashRounds?: number;
   verificationTokenExpiresIn?: number;
+  twoFactorJwt?: TwoFactorJwtConfig;
 }
 
 export interface AuthModuleAsyncOptions {
@@ -64,6 +77,23 @@ export interface JwtPayload {
   exp?: number;
 }
 
+export interface TwoFactorChallengePayload {
+  sub: string;
+  email: string;
+  twoFactorRequired: true;
+}
+
+export interface LoginResult {
+  user: AuthenticatedUser;
+  accessToken: string;
+}
+
+export interface TwoFactorChallengeResult {
+  challengeToken: string;
+  twoFactorRequired: true;
+  methods: string[];
+}
+
 export interface AuthenticatedUser {
   id: string;
   email: string;
@@ -72,3 +102,4 @@ export interface AuthenticatedUser {
 }
 
 export const AUTH_MODULE_OPTIONS = 'AUTH_MODULE_OPTIONS';
+export const OTP_SERVICE = 'OTP_SERVICE';

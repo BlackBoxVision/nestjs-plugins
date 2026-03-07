@@ -3,24 +3,34 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
+  Optional,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import * as bcrypt from 'bcryptjs';
 import { randomBytes } from 'crypto';
 
 import { RegisterDto, LoginDto } from './dto';
 import {
   AUTH_MODULE_OPTIONS,
+  OTP_SERVICE,
   AuthModuleOptions,
   AuthenticatedUser,
   JwtPayload,
+  LoginResult,
+  TwoFactorChallengePayload,
+  TwoFactorChallengeResult,
 } from './interfaces';
+import { AUTH_EVENTS } from './events';
 
 @Injectable()
 export class AuthService {
   private readonly prisma: any;
+  private readonly logger = new Logger(AuthService.name);
+  private readonly otpService: any;
 
   constructor(
     @Inject(AUTH_MODULE_OPTIONS)
@@ -28,8 +38,14 @@ export class AuthService {
     @Inject('PRISMA_SERVICE')
     prisma: any,
     private readonly jwtService: JwtService,
+    @Optional()
+    private readonly eventEmitter?: EventEmitter2,
+    @Optional()
+    @Inject(OTP_SERVICE)
+    otpService?: any,
   ) {
     this.prisma = prisma;
+    this.otpService = otpService ?? null;
   }
 
   async register(
@@ -62,6 +78,28 @@ export class AuthService {
       },
     });
 
+    let verificationToken: string | undefined;
+
+    if (this.isFeatureEnabled('emailVerification')) {
+      verificationToken = randomBytes(32).toString('hex');
+      const expiresIn = this.options.verificationTokenExpiresIn ?? 86400;
+
+      await this.prisma.verificationToken.create({
+        data: {
+          token: verificationToken,
+          type: 'email_verification',
+          userId: user.id,
+          expiresAt: new Date(Date.now() + expiresIn * 1000),
+        },
+      });
+    }
+
+    this.emitEvent(AUTH_EVENTS.USER_REGISTERED, {
+      userId: user.id,
+      email: user.email,
+      verificationToken,
+    });
+
     const accessToken = this.generateToken(user);
 
     return {
@@ -77,7 +115,7 @@ export class AuthService {
 
   async login(
     dto: LoginDto,
-  ): Promise<{ user: AuthenticatedUser; accessToken: string }> {
+  ): Promise<LoginResult | TwoFactorChallengeResult> {
     if (!this.isFeatureEnabled('emailPassword')) {
       throw new ForbiddenException('Email/password login is disabled');
     }
@@ -88,11 +126,72 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password');
     }
 
+    if (this.isTwoFactorEnabled() && this.otpService) {
+      const isOtpEnabled = await this.otpService.isOtpEnabled(user.id);
+      if (isOtpEnabled) {
+        const methods = await this.otpService.getEnabledMethods(user.id);
+        const challengeToken = this.generateChallengeToken(user);
+        return {
+          challengeToken,
+          twoFactorRequired: true,
+          methods,
+        };
+      }
+    }
+
     await this.prisma.user.update({
       where: { id: user.id },
       data: { lastLoginAt: new Date() },
     });
 
+    const accessToken = this.generateToken(user);
+
+    return { user, accessToken };
+  }
+
+  async verifyTwoFactor(
+    challengeToken: string,
+    code: string,
+    method?: string,
+  ): Promise<LoginResult> {
+    if (!this.isTwoFactorEnabled()) {
+      throw new ForbiddenException('Two-factor authentication is disabled');
+    }
+
+    if (!this.otpService) {
+      throw new ForbiddenException(
+        'OTP service is not available. Import @bbv/nestjs-otp module.',
+      );
+    }
+
+    let payload: TwoFactorChallengePayload;
+    try {
+      const secret =
+        this.options.twoFactorJwt?.challengeTokenSecret ??
+        this.options.jwt.secret;
+      payload = this.jwtService.verify(challengeToken, { secret }) as TwoFactorChallengePayload;
+    } catch {
+      throw new UnauthorizedException('Invalid or expired challenge token');
+    }
+
+    if (!payload.twoFactorRequired) {
+      throw new UnauthorizedException('Invalid challenge token');
+    }
+
+    const result = await this.otpService.verifyOtp(payload.sub, code, {
+      method,
+    });
+
+    if (!result.success) {
+      throw new UnauthorizedException('Invalid OTP code');
+    }
+
+    await this.prisma.user.update({
+      where: { id: payload.sub },
+      data: { lastLoginAt: new Date() },
+    });
+
+    const user = await this.getProfile(payload.sub);
     const accessToken = this.generateToken(user);
 
     return { user, accessToken };
@@ -173,6 +272,10 @@ export class AuthService {
       }),
     ]);
 
+    this.emitEvent(AUTH_EVENTS.EMAIL_VERIFIED, {
+      userId: verificationToken.userId,
+    });
+
     return { success: true };
   }
 
@@ -202,8 +305,12 @@ export class AuthService {
       },
     });
 
-    // The consuming application should listen for this token and send the email.
-    // This library does not handle email sending directly.
+    this.emitEvent(AUTH_EVENTS.FORGOT_PASSWORD, {
+      userId: user.id,
+      email: user.email,
+      resetToken: token,
+      expiresInSeconds: expiresIn,
+    });
 
     return { success: true };
   }
@@ -249,6 +356,11 @@ export class AuthService {
         data: { usedAt: new Date() },
       }),
     ]);
+
+    this.emitEvent(AUTH_EVENTS.PASSWORD_RESET, {
+      userId: verificationToken.userId,
+      email: '',
+    });
 
     return { success: true };
   }
@@ -451,9 +563,38 @@ export class AuthService {
     };
   }
 
+  private generateChallengeToken(user: { id: string; email: string }): string {
+    const payload: TwoFactorChallengePayload = {
+      sub: user.id,
+      email: user.email,
+      twoFactorRequired: true,
+    };
+
+    const secret =
+      this.options.twoFactorJwt?.challengeTokenSecret ??
+      this.options.jwt.secret;
+    const expiresIn =
+      this.options.twoFactorJwt?.challengeTokenExpiresIn ?? '5m';
+
+    return this.jwtService.sign(payload, { secret, expiresIn });
+  }
+
+  private isTwoFactorEnabled(): boolean {
+    const twoFactor = this.options.features?.twoFactor;
+    if (typeof twoFactor === 'boolean') return twoFactor;
+    if (typeof twoFactor === 'object') return twoFactor.enabled;
+    return false;
+  }
+
   private isFeatureEnabled(
     feature: keyof NonNullable<AuthModuleOptions['features']>,
   ): boolean {
     return this.options.features?.[feature] !== false;
+  }
+
+  private emitEvent(event: string, payload: Record<string, unknown>): void {
+    if (this.eventEmitter) {
+      this.eventEmitter.emit(event, payload);
+    }
   }
 }
