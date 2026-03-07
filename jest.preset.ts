@@ -11,10 +11,10 @@ const baseConfig: Config = {
   testEnvironment: 'node',
   coverageThreshold: {
     global: {
-      branches: 35,
-      functions: 40,
-      lines: 40,
-      statements: 40,
+      branches: 65,
+      functions: 65,
+      lines: 80,
+      statements: 80,
     },
   },
 };

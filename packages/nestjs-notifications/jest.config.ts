@@ -7,10 +7,10 @@ const config: Config = {
   rootDir: '.',
   coverageThreshold: {
     global: {
-      branches: 38,
-      functions: 50,
-      lines: 50,
-      statements: 50,
+      branches: 80,
+      functions: 90,
+      lines: 88,
+      statements: 88,
     },
   },
 };
