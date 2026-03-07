@@ -16,6 +16,7 @@ jest.mock('./channels/push/providers/firebase.provider', () => ({
 }));
 jest.mock('bullmq', () => ({
   Queue: jest.fn().mockImplementation(() => ({})),
+  Worker: jest.fn().mockImplementation(() => ({ close: jest.fn() })),
 }));
 jest.mock('@nestjs/bullmq', () => ({
   BullModule: {
@@ -48,8 +49,12 @@ import {
   EMAIL_PROVIDER,
   SMS_PROVIDER,
   PUSH_PROVIDER,
+  EMAIL_WORKER,
+  SMS_WORKER,
+  PUSH_WORKER,
   type NotificationModuleOptions,
 } from './interfaces';
+import { WorkerCleanupService } from './worker-cleanup.service';
 
 describe('NotificationModule', () => {
   describe('forRoot', () => {
@@ -366,6 +371,21 @@ describe('NotificationModule', () => {
       );
 
       expect(optionsProvider.inject).toEqual([]);
+    });
+
+    it('should include worker tokens and WorkerCleanupService in providers', () => {
+      const result = NotificationModule.forRootAsync({
+        useFactory: () => ({
+          channels: {},
+        }),
+        inject: [],
+      });
+
+      const providerTokens = extractProviderTokens(result.providers as any[]);
+      expect(providerTokens).toContain(EMAIL_WORKER);
+      expect(providerTokens).toContain(SMS_WORKER);
+      expect(providerTokens).toContain(PUSH_WORKER);
+      expect(providerTokens).toContain(WorkerCleanupService);
     });
 
     it('should export all core services', () => {

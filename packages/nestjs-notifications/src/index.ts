@@ -34,12 +34,18 @@ export { PreferenceController } from './preferences/preference.controller';
 // Templates
 export { TemplateService } from './templates/template.service';
 
+// Worker cleanup
+export { WorkerCleanupService } from './worker-cleanup.service';
+
 // Interfaces and constants
 export {
   NOTIFICATION_MODULE_OPTIONS,
   EMAIL_PROVIDER,
   SMS_PROVIDER,
   PUSH_PROVIDER,
+  EMAIL_WORKER,
+  SMS_WORKER,
+  PUSH_WORKER,
 } from './interfaces';
 
 // Auth integration

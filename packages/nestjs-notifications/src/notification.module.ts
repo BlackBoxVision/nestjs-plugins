@@ -1,13 +1,19 @@
 import { DynamicModule, Module, Provider, Type } from '@nestjs/common';
 import { BullModule, getQueueToken } from '@nestjs/bullmq';
-import { Queue } from 'bullmq';
+import { Queue, Worker, Job } from 'bullmq';
 import {
   NOTIFICATION_MODULE_OPTIONS,
   EMAIL_PROVIDER,
   SMS_PROVIDER,
   PUSH_PROVIDER,
+  EMAIL_WORKER,
+  SMS_WORKER,
+  PUSH_WORKER,
   type NotificationModuleOptions,
   type NotificationModuleAsyncOptions,
+  type EmailProvider,
+  type SmsProvider,
+  type PushProvider,
 } from './interfaces';
 import { NotificationService } from './notification.service';
 import { InAppService } from './channels/in-app/in-app.service';
@@ -24,6 +30,7 @@ import { SmtpEmailProvider } from './channels/email/providers/smtp.provider';
 import { SendGridEmailProvider } from './channels/email/providers/sendgrid.provider';
 import { TwilioSmsProvider } from './channels/sms/providers/twilio.provider';
 import { FirebasePushProvider } from './channels/push/providers/firebase.provider';
+import { WorkerCleanupService } from './worker-cleanup.service';
 
 @Module({})
 export class NotificationModule {
@@ -256,6 +263,84 @@ export class NotificationModule {
         },
         inject: [NOTIFICATION_MODULE_OPTIONS],
       },
+      // Worker factories — create BullMQ Workers manually to bypass @Processor
+      // decorator discovery which would start workers before async options resolve.
+      {
+        provide: EMAIL_WORKER,
+        useFactory: (
+          options: NotificationModuleOptions,
+          emailProvider: EmailProvider | null,
+          prisma: any,
+        ) => {
+          if (!options.channels.email?.enabled || !options.queue?.redis || !emailProvider) {
+            return null;
+          }
+          const processor = new EmailProcessor(emailProvider, prisma);
+          return new Worker(
+            'notifications-email',
+            async (job: Job) => processor.process(job),
+            {
+              connection: {
+                host: options.queue.redis.host,
+                port: options.queue.redis.port ?? 6379,
+                password: options.queue.redis.password,
+              },
+            },
+          );
+        },
+        inject: [NOTIFICATION_MODULE_OPTIONS, EMAIL_PROVIDER, 'PRISMA_SERVICE'],
+      },
+      {
+        provide: SMS_WORKER,
+        useFactory: (
+          options: NotificationModuleOptions,
+          smsProvider: SmsProvider | null,
+          prisma: any,
+        ) => {
+          if (!options.channels.sms?.enabled || !options.queue?.redis || !smsProvider) {
+            return null;
+          }
+          const processor = new SmsProcessor(smsProvider, prisma);
+          return new Worker(
+            'notifications-sms',
+            async (job: Job) => processor.process(job),
+            {
+              connection: {
+                host: options.queue.redis.host,
+                port: options.queue.redis.port ?? 6379,
+                password: options.queue.redis.password,
+              },
+            },
+          );
+        },
+        inject: [NOTIFICATION_MODULE_OPTIONS, SMS_PROVIDER, 'PRISMA_SERVICE'],
+      },
+      {
+        provide: PUSH_WORKER,
+        useFactory: (
+          options: NotificationModuleOptions,
+          pushProvider: PushProvider | null,
+          prisma: any,
+        ) => {
+          if (!options.channels.push?.enabled || !options.queue?.redis || !pushProvider) {
+            return null;
+          }
+          const processor = new PushProcessor(pushProvider, prisma);
+          return new Worker(
+            'notifications-push',
+            async (job: Job) => processor.process(job),
+            {
+              connection: {
+                host: options.queue.redis.host,
+                port: options.queue.redis.port ?? 6379,
+                password: options.queue.redis.password,
+              },
+            },
+          );
+        },
+        inject: [NOTIFICATION_MODULE_OPTIONS, PUSH_PROVIDER, 'PRISMA_SERVICE'],
+      },
+      WorkerCleanupService,
     ];
 
     const controllers: Type[] = [InAppController, DeviceTokenController, PreferenceController];
