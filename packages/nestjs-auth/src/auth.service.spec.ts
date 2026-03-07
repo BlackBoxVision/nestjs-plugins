@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
 import * as bcrypt from 'bcryptjs';
@@ -59,7 +59,7 @@ describe('AuthService', () => {
       providers: [
         AuthService,
         { provide: AUTH_MODULE_OPTIONS, useValue: defaultOptions },
-        { provide: 'PrismaService', useValue: mockPrismaService },
+        { provide: 'PRISMA_SERVICE', useValue: mockPrismaService },
         { provide: JwtService, useValue: mockJwtService },
       ],
     }).compile();
@@ -120,7 +120,7 @@ describe('AuthService', () => {
               features: { emailPassword: false },
             },
           },
-          { provide: 'PrismaService', useValue: mockPrismaService },
+          { provide: 'PRISMA_SERVICE', useValue: mockPrismaService },
           { provide: JwtService, useValue: mockJwtService },
         ],
       }).compile();
@@ -394,6 +394,344 @@ describe('AuthService', () => {
     });
   });
 
+  describe('login - feature disabled', () => {
+    it('should throw ForbiddenException if emailPassword feature is disabled', async () => {
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          AuthService,
+          {
+            provide: AUTH_MODULE_OPTIONS,
+            useValue: {
+              ...defaultOptions,
+              features: { ...defaultOptions.features, emailPassword: false },
+            },
+          },
+          { provide: 'PRISMA_SERVICE', useValue: mockPrismaService },
+          { provide: JwtService, useValue: mockJwtService },
+        ],
+      }).compile();
+
+      const restrictedService = module.get<AuthService>(AuthService);
+
+      await expect(
+        restrictedService.login({ email: 'test@example.com', password: 'password123' }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('verifyEmail - feature disabled', () => {
+    it('should throw ForbiddenException if emailVerification feature is disabled', async () => {
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          AuthService,
+          {
+            provide: AUTH_MODULE_OPTIONS,
+            useValue: {
+              ...defaultOptions,
+              features: { ...defaultOptions.features, emailVerification: false },
+            },
+          },
+          { provide: 'PRISMA_SERVICE', useValue: mockPrismaService },
+          { provide: JwtService, useValue: mockJwtService },
+        ],
+      }).compile();
+
+      const restrictedService = module.get<AuthService>(AuthService);
+
+      await expect(restrictedService.verifyEmail('some-token')).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+
+    it('should throw BadRequestException for wrong token type', async () => {
+      mockPrismaService.verificationToken.findUnique.mockResolvedValue({
+        id: 'token-1',
+        token: 'wrong-type-token',
+        type: 'password_reset',
+        userId: 'user-1',
+        expiresAt: new Date(Date.now() + 86400000),
+        usedAt: null,
+      });
+
+      await expect(service.verifyEmail('wrong-type-token')).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+  });
+
+  describe('forgotPassword - feature disabled', () => {
+    it('should throw ForbiddenException if passwordReset feature is disabled', async () => {
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          AuthService,
+          {
+            provide: AUTH_MODULE_OPTIONS,
+            useValue: {
+              ...defaultOptions,
+              features: { ...defaultOptions.features, passwordReset: false },
+            },
+          },
+          { provide: 'PRISMA_SERVICE', useValue: mockPrismaService },
+          { provide: JwtService, useValue: mockJwtService },
+        ],
+      }).compile();
+
+      const restrictedService = module.get<AuthService>(AuthService);
+
+      await expect(
+        restrictedService.forgotPassword('test@example.com'),
+      ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('resetPassword - additional paths', () => {
+    it('should throw ForbiddenException if passwordReset feature is disabled', async () => {
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          AuthService,
+          {
+            provide: AUTH_MODULE_OPTIONS,
+            useValue: {
+              ...defaultOptions,
+              features: { ...defaultOptions.features, passwordReset: false },
+            },
+          },
+          { provide: 'PRISMA_SERVICE', useValue: mockPrismaService },
+          { provide: JwtService, useValue: mockJwtService },
+        ],
+      }).compile();
+
+      const restrictedService = module.get<AuthService>(AuthService);
+
+      await expect(
+        restrictedService.resetPassword('some-token', 'newPass123'),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should throw BadRequestException for invalid token', async () => {
+      mockPrismaService.verificationToken.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.resetPassword('invalid-token', 'newPass123'),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException for already used token', async () => {
+      mockPrismaService.verificationToken.findUnique.mockResolvedValue({
+        id: 'token-1',
+        token: 'used-token',
+        type: 'password_reset',
+        userId: 'user-1',
+        expiresAt: new Date(Date.now() + 86400000),
+        usedAt: new Date(),
+      });
+
+      await expect(
+        service.resetPassword('used-token', 'newPass123'),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException for expired token', async () => {
+      mockPrismaService.verificationToken.findUnique.mockResolvedValue({
+        id: 'token-1',
+        token: 'expired-token',
+        type: 'password_reset',
+        userId: 'user-1',
+        expiresAt: new Date(Date.now() - 86400000),
+        usedAt: null,
+      });
+
+      await expect(
+        service.resetPassword('expired-token', 'newPass123'),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException for wrong token type', async () => {
+      mockPrismaService.verificationToken.findUnique.mockResolvedValue({
+        id: 'token-1',
+        token: 'wrong-type-token',
+        type: 'email_verification',
+        userId: 'user-1',
+        expiresAt: new Date(Date.now() + 86400000),
+        usedAt: null,
+      });
+
+      await expect(
+        service.resetPassword('wrong-type-token', 'newPass123'),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should hash new password and update user and token via $transaction', async () => {
+      mockPrismaService.verificationToken.findUnique.mockResolvedValue({
+        id: 'token-1',
+        token: 'valid-token',
+        type: 'password_reset',
+        userId: 'user-1',
+        expiresAt: new Date(Date.now() + 86400000),
+        usedAt: null,
+      });
+      (bcrypt.hash as jest.Mock).mockResolvedValue('new-hashed-password');
+      mockPrismaService.$transaction.mockResolvedValue([{}, {}]);
+      mockPrismaService.user.update.mockResolvedValue({});
+      mockPrismaService.verificationToken.update.mockResolvedValue({});
+
+      const result = await service.resetPassword('valid-token', 'newPassword123');
+
+      expect(result.success).toBe(true);
+      expect(bcrypt.hash).toHaveBeenCalledWith('newPassword123', 10);
+      expect(mockPrismaService.$transaction).toHaveBeenCalled();
+    });
+  });
+
+  describe('findOrCreateSocialUser', () => {
+    const socialProfile = {
+      providerAccountId: 'google-123',
+      email: 'social@example.com',
+      displayName: 'Social User',
+      avatarUrl: 'https://example.com/avatar.png',
+      accessToken: 'social-access-token',
+      refreshToken: 'social-refresh-token',
+    };
+
+    it('should update tokens and return user when account already exists', async () => {
+      const existingAccount = {
+        id: 'account-1',
+        provider: 'google',
+        providerAccountId: 'google-123',
+        user: {
+          id: 'user-1',
+          email: 'social@example.com',
+          emailVerified: true,
+          isActive: true,
+        },
+      };
+
+      mockPrismaService.account.findUnique.mockResolvedValue(existingAccount);
+      mockPrismaService.account.update.mockResolvedValue({});
+      mockPrismaService.user.update.mockResolvedValue({});
+
+      const result = await service.findOrCreateSocialUser('google', socialProfile);
+
+      expect(result.user.id).toBe('user-1');
+      expect(result.user.email).toBe('social@example.com');
+      expect(result.accessToken).toBe('mock-jwt-token');
+      expect(mockPrismaService.account.update).toHaveBeenCalledWith({
+        where: { id: 'account-1' },
+        data: {
+          accessToken: 'social-access-token',
+          refreshToken: 'social-refresh-token',
+        },
+      });
+      expect(mockPrismaService.user.update).toHaveBeenCalledWith({
+        where: { id: 'user-1' },
+        data: { lastLoginAt: expect.any(Date) },
+      });
+    });
+
+    it('should link account to existing user when accountLinking is enabled', async () => {
+      const existingUser = {
+        id: 'user-1',
+        email: 'social@example.com',
+        emailVerified: false,
+        isActive: true,
+        avatarUrl: null,
+      };
+
+      mockPrismaService.account.findUnique.mockResolvedValue(null);
+      mockPrismaService.user.findUnique.mockResolvedValue(existingUser);
+      mockPrismaService.account.create.mockResolvedValue({});
+      mockPrismaService.user.update.mockResolvedValue({});
+
+      const result = await service.findOrCreateSocialUser('google', socialProfile);
+
+      expect(result.user.id).toBe('user-1');
+      expect(result.accessToken).toBe('mock-jwt-token');
+      expect(mockPrismaService.account.create).toHaveBeenCalledWith({
+        data: {
+          userId: 'user-1',
+          provider: 'google',
+          providerAccountId: 'google-123',
+          accessToken: 'social-access-token',
+          refreshToken: 'social-refresh-token',
+        },
+      });
+      expect(mockPrismaService.user.update).toHaveBeenCalledWith({
+        where: { id: 'user-1' },
+        data: {
+          emailVerified: true,
+          lastLoginAt: expect.any(Date),
+          avatarUrl: 'https://example.com/avatar.png',
+        },
+      });
+    });
+
+    it('should create new user with social account when no user exists', async () => {
+      const createdUser = {
+        id: 'user-new',
+        email: 'social@example.com',
+        emailVerified: true,
+        isActive: true,
+      };
+
+      mockPrismaService.account.findUnique.mockResolvedValue(null);
+      mockPrismaService.user.findUnique.mockResolvedValue(null);
+      mockPrismaService.user.create.mockResolvedValue(createdUser);
+
+      const result = await service.findOrCreateSocialUser('google', socialProfile);
+
+      expect(result.user.id).toBe('user-new');
+      expect(result.user.email).toBe('social@example.com');
+      expect(result.accessToken).toBe('mock-jwt-token');
+      expect(mockPrismaService.user.create).toHaveBeenCalledWith({
+        data: {
+          email: 'social@example.com',
+          emailVerified: true,
+          avatarUrl: 'https://example.com/avatar.png',
+          lastLoginAt: expect.any(Date),
+          accounts: {
+            create: {
+              provider: 'google',
+              providerAccountId: 'google-123',
+              accessToken: 'social-access-token',
+              refreshToken: 'social-refresh-token',
+            },
+          },
+        },
+      });
+    });
+
+    it('should throw BadRequestException when user exists but accountLinking is disabled', async () => {
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          AuthService,
+          {
+            provide: AUTH_MODULE_OPTIONS,
+            useValue: {
+              ...defaultOptions,
+              features: { ...defaultOptions.features, accountLinking: false },
+            },
+          },
+          { provide: 'PRISMA_SERVICE', useValue: mockPrismaService },
+          { provide: JwtService, useValue: mockJwtService },
+        ],
+      }).compile();
+
+      const restrictedService = module.get<AuthService>(AuthService);
+
+      mockPrismaService.account.findUnique.mockResolvedValue(null);
+      mockPrismaService.user.findUnique.mockResolvedValue({
+        id: 'user-1',
+        email: 'social@example.com',
+        emailVerified: true,
+        isActive: true,
+      });
+
+      await expect(
+        restrictedService.findOrCreateSocialUser('google', socialProfile),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
   describe('createSession', () => {
     it('should create a new session', async () => {
       mockPrismaService.session.create.mockResolvedValue({
@@ -418,6 +756,175 @@ describe('AuthService', () => {
           expiresAt: expect.any(Date),
         },
       });
+    });
+
+    it('should throw ForbiddenException if sessionManagement feature is disabled', async () => {
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          AuthService,
+          {
+            provide: AUTH_MODULE_OPTIONS,
+            useValue: {
+              ...defaultOptions,
+              features: { ...defaultOptions.features, sessionManagement: false },
+            },
+          },
+          { provide: 'PRISMA_SERVICE', useValue: mockPrismaService },
+          { provide: JwtService, useValue: mockJwtService },
+        ],
+      }).compile();
+
+      const restrictedService = module.get<AuthService>(AuthService);
+
+      await expect(
+        restrictedService.createSession('user-1', '127.0.0.1', 'Mozilla/5.0'),
+      ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('revokeSession', () => {
+    it('should throw ForbiddenException if sessionManagement feature is disabled', async () => {
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          AuthService,
+          {
+            provide: AUTH_MODULE_OPTIONS,
+            useValue: {
+              ...defaultOptions,
+              features: { ...defaultOptions.features, sessionManagement: false },
+            },
+          },
+          { provide: 'PRISMA_SERVICE', useValue: mockPrismaService },
+          { provide: JwtService, useValue: mockJwtService },
+        ],
+      }).compile();
+
+      const restrictedService = module.get<AuthService>(AuthService);
+
+      await expect(
+        restrictedService.revokeSession('session-1', 'user-1'),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should throw NotFoundException when session is not found', async () => {
+      mockPrismaService.session.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.revokeSession('nonexistent-session', 'user-1'),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw NotFoundException when session belongs to a different user', async () => {
+      mockPrismaService.session.findUnique.mockResolvedValue({
+        id: 'session-1',
+        userId: 'user-2',
+      });
+
+      await expect(
+        service.revokeSession('session-1', 'user-1'),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should delete session when session exists and belongs to user', async () => {
+      mockPrismaService.session.findUnique.mockResolvedValue({
+        id: 'session-1',
+        userId: 'user-1',
+      });
+      mockPrismaService.session.delete.mockResolvedValue({});
+
+      await service.revokeSession('session-1', 'user-1');
+
+      expect(mockPrismaService.session.delete).toHaveBeenCalledWith({
+        where: { id: 'session-1' },
+      });
+    });
+  });
+
+  describe('getUserSessions', () => {
+    it('should throw ForbiddenException if sessionManagement feature is disabled', async () => {
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          AuthService,
+          {
+            provide: AUTH_MODULE_OPTIONS,
+            useValue: {
+              ...defaultOptions,
+              features: { ...defaultOptions.features, sessionManagement: false },
+            },
+          },
+          { provide: 'PRISMA_SERVICE', useValue: mockPrismaService },
+          { provide: JwtService, useValue: mockJwtService },
+        ],
+      }).compile();
+
+      const restrictedService = module.get<AuthService>(AuthService);
+
+      await expect(
+        restrictedService.getUserSessions('user-1'),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should return sessions for a user', async () => {
+      const mockSessions = [
+        {
+          id: 'session-1',
+          ipAddress: '127.0.0.1',
+          userAgent: 'Mozilla/5.0',
+          createdAt: new Date(),
+          expiresAt: new Date(Date.now() + 86400000),
+        },
+      ];
+
+      mockPrismaService.session.findMany.mockResolvedValue(mockSessions);
+
+      const result = await service.getUserSessions('user-1');
+
+      expect(result).toEqual(mockSessions);
+      expect(mockPrismaService.session.findMany).toHaveBeenCalledWith({
+        where: {
+          userId: 'user-1',
+          expiresAt: { gt: expect.any(Date) },
+        },
+        select: {
+          id: true,
+          ipAddress: true,
+          userAgent: true,
+          createdAt: true,
+          expiresAt: true,
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+    });
+  });
+
+  describe('getProfile', () => {
+    it('should return user profile when user is found', async () => {
+      mockPrismaService.user.findUnique.mockResolvedValue({
+        id: 'user-1',
+        email: 'test@example.com',
+        emailVerified: true,
+        isActive: true,
+      });
+
+      const result = await service.getProfile('user-1');
+
+      expect(result).toEqual({
+        id: 'user-1',
+        email: 'test@example.com',
+        emailVerified: true,
+        isActive: true,
+      });
+      expect(mockPrismaService.user.findUnique).toHaveBeenCalledWith({
+        where: { id: 'user-1' },
+      });
+    });
+
+    it('should throw NotFoundException when user is not found', async () => {
+      mockPrismaService.user.findUnique.mockResolvedValue(null);
+
+      await expect(service.getProfile('nonexistent-user')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 });

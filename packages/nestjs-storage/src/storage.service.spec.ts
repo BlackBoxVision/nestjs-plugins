@@ -61,7 +61,7 @@ describe('StorageService', () => {
         StorageService,
         { provide: STORAGE_PROVIDER, useValue: mockProvider },
         { provide: STORAGE_MODULE_OPTIONS, useValue: defaultOptions },
-        { provide: 'PrismaService', useValue: mockPrismaService },
+        { provide: 'PRISMA_SERVICE', useValue: mockPrismaService },
       ],
     }).compile();
 
@@ -169,7 +169,7 @@ describe('StorageService', () => {
           StorageService,
           { provide: STORAGE_PROVIDER, useValue: mockProvider },
           { provide: STORAGE_MODULE_OPTIONS, useValue: optionsWithTracking },
-          { provide: 'PrismaService', useValue: mockPrismaService },
+          { provide: 'PRISMA_SERVICE', useValue: mockPrismaService },
         ],
       }).compile();
 
@@ -235,7 +235,7 @@ describe('StorageService', () => {
           StorageService,
           { provide: STORAGE_PROVIDER, useValue: mockProvider },
           { provide: STORAGE_MODULE_OPTIONS, useValue: optionsWithTracking },
-          { provide: 'PrismaService', useValue: mockPrismaService },
+          { provide: 'PRISMA_SERVICE', useValue: mockPrismaService },
         ],
       }).compile();
 
