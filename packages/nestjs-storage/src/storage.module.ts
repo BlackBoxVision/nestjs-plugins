@@ -79,6 +79,7 @@ export class StorageModule {
     return {
       module: StorageModule,
       imports: options.imports ?? [],
+      controllers: [StorageController],
       providers: [
         asyncOptionsProvider,
         asyncStorageProvider,
