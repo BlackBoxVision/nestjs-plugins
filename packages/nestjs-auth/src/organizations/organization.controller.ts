@@ -18,6 +18,7 @@ import {
 
 import { CurrentUser } from '../decorators/current-user.decorator';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
+import { OrganizationsFeatureGuard } from '../guards/feature-enabled.guard';
 import { OrgMemberGuard } from '../guards/org-member.guard';
 import { OrgRoles } from '../decorators/org-roles.decorator';
 import { AuthenticatedUser } from '../interfaces';
@@ -29,7 +30,7 @@ import { AddMemberDto } from './dto/add-member.dto';
 
 @ApiTags('Organizations')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(OrganizationsFeatureGuard, JwtAuthGuard)
 @Controller('organizations')
 export class OrganizationController {
   constructor(private readonly organizationService: OrganizationService) {}

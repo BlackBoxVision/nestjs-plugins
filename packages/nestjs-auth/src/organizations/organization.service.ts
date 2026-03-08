@@ -5,13 +5,47 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { PRISMA_SERVICE } from '@bbv/nestjs-prisma';
+import { ROLES } from '../constants';
+
+export interface OrganizationMemberUser {
+  id: string;
+  email: string;
+}
+
+export interface OrganizationMember {
+  id: string;
+  userId: string;
+  organizationId: string;
+  role: string;
+  user: OrganizationMemberUser;
+}
+
+export interface Organization {
+  id: string;
+  name: string;
+  slug: string;
+  logoUrl?: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  members: OrganizationMember[];
+}
+
+export interface OrganizationBasic {
+  id: string;
+  name: string;
+  slug: string;
+  logoUrl?: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 @Injectable()
 export class OrganizationService {
   private readonly prisma: any;
 
   constructor(
-    @Inject('PRISMA_SERVICE')
+    @Inject(PRISMA_SERVICE)
     prisma: any,
   ) {
     this.prisma = prisma;
@@ -21,7 +55,7 @@ export class OrganizationService {
     name: string,
     slug: string,
     userId: string,
-  ): Promise<any> {
+  ): Promise<Organization> {
     const existing = await this.prisma.organization.findUnique({
       where: { slug },
     });
@@ -37,7 +71,7 @@ export class OrganizationService {
         members: {
           create: {
             userId,
-            role: 'owner',
+            role: ROLES.OWNER,
           },
         },
       },
@@ -49,7 +83,7 @@ export class OrganizationService {
     });
   }
 
-  async findAll(userId: string): Promise<any[]> {
+  async findAll(userId: string): Promise<Organization[]> {
     return this.prisma.organization.findMany({
       where: {
         members: {
@@ -62,10 +96,11 @@ export class OrganizationService {
         },
       },
       orderBy: { createdAt: 'desc' },
+      take: 100,
     });
   }
 
-  async findOne(id: string): Promise<any> {
+  async findOne(id: string): Promise<Organization> {
     const org = await this.prisma.organization.findUnique({
       where: { id },
       include: {
@@ -85,7 +120,7 @@ export class OrganizationService {
   async update(
     id: string,
     data: { name?: string; slug?: string; logoUrl?: string },
-  ): Promise<any> {
+  ): Promise<OrganizationBasic> {
     const org = await this.prisma.organization.findUnique({
       where: { id },
     });
@@ -113,8 +148,8 @@ export class OrganizationService {
   async addMember(
     organizationId: string,
     userId: string,
-    role: string = 'member',
-  ): Promise<any> {
+    role: string = ROLES.MEMBER,
+  ): Promise<OrganizationMember> {
     const org = await this.prisma.organization.findUnique({
       where: { id: organizationId },
     });
@@ -165,11 +200,11 @@ export class OrganizationService {
       throw new NotFoundException('Membership not found');
     }
 
-    if (membership.role === 'owner') {
+    if (membership.role === ROLES.OWNER) {
       const ownerCount = await this.prisma.organizationMember.count({
         where: {
           organizationId,
-          role: 'owner',
+          role: ROLES.OWNER,
         },
       });
 
@@ -189,7 +224,7 @@ export class OrganizationService {
     organizationId: string,
     userId: string,
     role: string,
-  ): Promise<any> {
+  ): Promise<OrganizationMember> {
     const membership = await this.prisma.organizationMember.findUnique({
       where: {
         userId_organizationId: {

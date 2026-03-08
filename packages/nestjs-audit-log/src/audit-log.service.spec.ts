@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { PRISMA_SERVICE, createMockPrismaService } from '@bbv/nestjs-prisma';
 import { AuditLogService } from './audit-log.service';
 import { AUDIT_LOG_MODULE_OPTIONS, AuditLogModuleOptions } from './interfaces';
 
@@ -8,15 +9,12 @@ describe('AuditLogService', () => {
   let mockOptions: AuditLogModuleOptions;
 
   beforeEach(async () => {
-    mockPrisma = {
-      auditLog: {
-        create: jest.fn().mockResolvedValue({ id: 'log-1' }),
-        findMany: jest.fn().mockResolvedValue([]),
-        findUnique: jest.fn().mockResolvedValue(null),
-        count: jest.fn().mockResolvedValue(0),
-        deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
-      },
-    };
+    mockPrisma = createMockPrismaService();
+    mockPrisma.auditLog.create.mockResolvedValue({ id: 'log-1' });
+    mockPrisma.auditLog.findMany.mockResolvedValue([]);
+    mockPrisma.auditLog.findUnique.mockResolvedValue(null);
+    mockPrisma.auditLog.count.mockResolvedValue(0);
+    mockPrisma.auditLog.deleteMany.mockResolvedValue({ count: 0 });
 
     mockOptions = {
       features: {
@@ -31,7 +29,7 @@ describe('AuditLogService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuditLogService,
-        { provide: 'PRISMA_SERVICE', useValue: mockPrisma },
+        { provide: PRISMA_SERVICE, useValue: mockPrisma },
         { provide: AUDIT_LOG_MODULE_OPTIONS, useValue: mockOptions },
       ],
     }).compile();
@@ -225,6 +223,7 @@ describe('AuditLogService', () => {
       expect(mockPrisma.auditLog.findMany).toHaveBeenCalledWith({
         where: { entity: 'Claim', entityId: 'c-1' },
         orderBy: { createdAt: 'desc' },
+        take: 50,
       });
     });
 

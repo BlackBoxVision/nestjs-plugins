@@ -16,8 +16,8 @@ interface ExceptionResponseBody {
 }
 
 @Catch()
-export class HttpExceptionFilter implements ExceptionFilter {
-  private readonly logger = new Logger(HttpExceptionFilter.name);
+export class AllExceptionsFilter implements ExceptionFilter {
+  private readonly logger = new Logger(AllExceptionsFilter.name);
 
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
@@ -81,3 +81,6 @@ export class HttpExceptionFilter implements ExceptionFilter {
     return errors;
   }
 }
+
+/** @deprecated Use `AllExceptionsFilter` instead. */
+export { AllExceptionsFilter as HttpExceptionFilter };

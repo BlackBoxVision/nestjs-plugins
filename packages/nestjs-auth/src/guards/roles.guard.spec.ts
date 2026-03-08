@@ -61,43 +61,43 @@ describe('RolesGuard', () => {
     expect(guard.canActivate(context)).toBe(false);
   });
 
-  it('should return false when user has no roles property', () => {
+  it('should return false when user has no role property', () => {
     const context = createMockExecutionContext({ id: 'u1', email: 'test@test.com' });
     jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['admin']);
 
     expect(guard.canActivate(context)).toBe(false);
   });
 
-  it('should return true when user has at least one matching role', () => {
-    const user = { id: 'u1', roles: ['user', 'admin'] };
+  it('should return true when user role matches one of the required roles', () => {
+    const user = { id: 'u1', role: 'admin' };
     const context = createMockExecutionContext(user);
     jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['admin']);
 
     expect(guard.canActivate(context)).toBe(true);
   });
 
-  it('should return false when user has no matching roles', () => {
-    const user = { id: 'u1', roles: ['user'] };
+  it('should return false when user role does not match any required role', () => {
+    const user = { id: 'u1', role: 'user' };
     const context = createMockExecutionContext(user);
     jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['admin', 'superadmin']);
 
     expect(guard.canActivate(context)).toBe(false);
   });
 
-  it('should return true when user has all matching roles', () => {
-    const user = { id: 'u1', roles: ['admin', 'superadmin', 'user'] };
-    const context = createMockExecutionContext(user);
-    jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['admin', 'superadmin']);
-
-    expect(guard.canActivate(context)).toBe(true);
-  });
-
-  it('should return true when at least one required role matches (some, not every)', () => {
-    const user = { id: 'u1', roles: ['editor'] };
+  it('should return true when user role is among multiple required roles', () => {
+    const user = { id: 'u1', role: 'editor' };
     const context = createMockExecutionContext(user);
     jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['admin', 'editor']);
 
     expect(guard.canActivate(context)).toBe(true);
+  });
+
+  it('should return false when user role is undefined', () => {
+    const user = { id: 'u1', role: undefined };
+    const context = createMockExecutionContext(user);
+    jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['admin']);
+
+    expect(guard.canActivate(context)).toBe(false);
   });
 
   it('should call reflector.getAllAndOverride with ROLES_KEY and correct targets', () => {

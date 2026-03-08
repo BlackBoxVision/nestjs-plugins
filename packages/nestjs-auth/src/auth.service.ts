@@ -25,6 +25,8 @@ import {
   TwoFactorChallengeResult,
 } from './interfaces';
 import { AUTH_EVENTS } from './events';
+import { ROLES, VERIFICATION_TOKEN_TYPES, AUTH_PROVIDERS } from './constants';
+import { PRISMA_SERVICE } from '@bbv/nestjs-prisma';
 
 @Injectable()
 export class AuthService {
@@ -35,7 +37,7 @@ export class AuthService {
   constructor(
     @Inject(AUTH_MODULE_OPTIONS)
     private readonly options: AuthModuleOptions,
-    @Inject('PRISMA_SERVICE')
+    @Inject(PRISMA_SERVICE)
     prisma: any,
     private readonly jwtService: JwtService,
     @Optional()
@@ -69,8 +71,8 @@ export class AuthService {
     const role =
       this.options.defaultAdminEmail &&
       dto.email === this.options.defaultAdminEmail
-        ? 'admin'
-        : 'user';
+        ? ROLES.ADMIN
+        : ROLES.USER;
 
     const user = await this.prisma.user.create({
       data: {
@@ -79,9 +81,16 @@ export class AuthService {
         role,
         accounts: {
           create: {
-            provider: 'credentials',
+            provider: AUTH_PROVIDERS.CREDENTIALS,
           },
         },
+      },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        emailVerified: true,
+        isActive: true,
       },
     });
 
@@ -94,7 +103,7 @@ export class AuthService {
       await this.prisma.verificationToken.create({
         data: {
           token: verificationToken,
-          type: 'email_verification',
+          type: VERIFICATION_TOKEN_TYPES.EMAIL_VERIFICATION,
           userId: user.id,
           expiresAt: new Date(Date.now() + expiresIn * 1000),
         },
@@ -110,13 +119,7 @@ export class AuthService {
     const accessToken = this.generateToken(user);
 
     return {
-      user: {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        emailVerified: user.emailVerified,
-        isActive: user.isActive,
-      },
+      user: this.toAuthenticatedUser(user),
       accessToken,
     };
   }
@@ -135,9 +138,9 @@ export class AuthService {
     }
 
     if (this.isTwoFactorEnabled() && this.otpService) {
-      const isOtpEnabled = await this.otpService.isOtpEnabled(user.id);
+      const methods = await this.otpService.getEnabledMethods(user.id);
+      const isOtpEnabled = methods.length > 0;
       if (isOtpEnabled) {
-        const methods = await this.otpService.getEnabledMethods(user.id);
         const challengeToken = this.generateChallengeToken(user);
         return {
           challengeToken,
@@ -227,20 +230,16 @@ export class AuthService {
       return null;
     }
 
-    return {
-      id: user.id,
-      email: user.email,
-      role: user.role,
-      emailVerified: user.emailVerified,
-      isActive: user.isActive,
-    };
+    return this.toAuthenticatedUser(user);
   }
 
-  generateToken(user: { id: string; email: string; role?: string }): string {
+  generateToken(user: { id: string; email: string; role?: string; emailVerified?: boolean; isActive?: boolean }): string {
     const payload: JwtPayload = {
       sub: user.id,
       email: user.email,
       role: user.role,
+      emailVerified: user.emailVerified ?? false,
+      isActive: user.isActive ?? true,
     };
 
     return this.jwtService.sign(payload);
@@ -251,25 +250,10 @@ export class AuthService {
       throw new ForbiddenException('Email verification is disabled');
     }
 
-    const verificationToken = await this.prisma.verificationToken.findUnique({
-      where: { token },
-    });
-
-    if (!verificationToken) {
-      throw new BadRequestException('Invalid verification token');
-    }
-
-    if (verificationToken.usedAt) {
-      throw new BadRequestException('Token has already been used');
-    }
-
-    if (new Date() > verificationToken.expiresAt) {
-      throw new BadRequestException('Token has expired');
-    }
-
-    if (verificationToken.type !== 'email_verification') {
-      throw new BadRequestException('Invalid token type');
-    }
+    const verificationToken = await this.validateAndConsumeToken(
+      token,
+      VERIFICATION_TOKEN_TYPES.EMAIL_VERIFICATION,
+    );
 
     await this.prisma.$transaction([
       this.prisma.user.update({
@@ -309,7 +293,7 @@ export class AuthService {
     await this.prisma.verificationToken.create({
       data: {
         token,
-        type: 'password_reset',
+        type: VERIFICATION_TOKEN_TYPES.PASSWORD_RESET,
         userId: user.id,
         expiresAt: new Date(Date.now() + expiresIn * 1000),
       },
@@ -333,25 +317,10 @@ export class AuthService {
       throw new ForbiddenException('Password reset is disabled');
     }
 
-    const verificationToken = await this.prisma.verificationToken.findUnique({
-      where: { token },
-    });
-
-    if (!verificationToken) {
-      throw new BadRequestException('Invalid reset token');
-    }
-
-    if (verificationToken.usedAt) {
-      throw new BadRequestException('Token has already been used');
-    }
-
-    if (new Date() > verificationToken.expiresAt) {
-      throw new BadRequestException('Token has expired');
-    }
-
-    if (verificationToken.type !== 'password_reset') {
-      throw new BadRequestException('Invalid token type');
-    }
+    const verificationToken = await this.validateAndConsumeToken(
+      token,
+      VERIFICATION_TOKEN_TYPES.PASSWORD_RESET,
+    );
 
     const rounds = this.options.passwordHashRounds ?? 10;
     const passwordHash = await bcrypt.hash(newPassword, rounds);
@@ -414,13 +383,7 @@ export class AuthService {
       const accessToken = this.generateToken(account.user);
 
       return {
-        user: {
-          id: account.user.id,
-          email: account.user.email,
-          role: account.user.role,
-          emailVerified: account.user.emailVerified,
-          isActive: account.user.isActive,
-        },
+        user: this.toAuthenticatedUser(account.user),
         accessToken,
       };
     }
@@ -477,13 +440,7 @@ export class AuthService {
     const accessToken = this.generateToken(user);
 
     return {
-      user: {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        emailVerified: user.emailVerified,
-        isActive: user.isActive,
-      },
+      user: this.toAuthenticatedUser(user),
       accessToken,
     };
   }
@@ -555,25 +512,74 @@ export class AuthService {
         expiresAt: true,
       },
       orderBy: { createdAt: 'desc' },
+      take: 50,
     });
   }
 
   async getProfile(userId: string): Promise<AuthenticatedUser> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        emailVerified: true,
+        isActive: true,
+      },
     });
 
     if (!user) {
       throw new NotFoundException('User not found');
     }
 
+    return this.toAuthenticatedUser(user);
+  }
+
+  private toAuthenticatedUser(user: {
+    id: string;
+    email: string;
+    role?: string;
+    emailVerified?: boolean;
+    isActive?: boolean;
+  }): AuthenticatedUser {
     return {
       id: user.id,
       email: user.email,
       role: user.role,
-      emailVerified: user.emailVerified,
-      isActive: user.isActive,
+      emailVerified: user.emailVerified ?? false,
+      isActive: user.isActive ?? false,
     };
+  }
+
+  private async validateAndConsumeToken(
+    token: string,
+    expectedType: string,
+  ): Promise<{ id: string; userId: string; token: string; type: string; expiresAt: Date; usedAt: Date | null }> {
+    const verificationToken = await this.prisma.verificationToken.findUnique({
+      where: { token },
+    });
+
+    if (!verificationToken) {
+      throw new BadRequestException(
+        expectedType === VERIFICATION_TOKEN_TYPES.EMAIL_VERIFICATION
+          ? 'Invalid verification token'
+          : 'Invalid reset token',
+      );
+    }
+
+    if (verificationToken.usedAt) {
+      throw new BadRequestException('Token has already been used');
+    }
+
+    if (new Date() > verificationToken.expiresAt) {
+      throw new BadRequestException('Token has expired');
+    }
+
+    if (verificationToken.type !== expectedType) {
+      throw new BadRequestException('Invalid token type');
+    }
+
+    return verificationToken;
   }
 
   private generateChallengeToken(user: { id: string; email: string }): string {

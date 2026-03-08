@@ -1,8 +1,10 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Inject, Logger } from '@nestjs/common';
+import { PRISMA_SERVICE } from '@bbv/nestjs-prisma';
 import type { Job } from 'bullmq';
 import type { EmailProvider, EmailSendOptions } from '../../interfaces';
 import { EMAIL_PROVIDER } from '../../interfaces';
+import { BaseNotificationProcessor } from '../base.processor';
 
 export interface EmailJobData {
   notificationId: string;
@@ -16,26 +18,26 @@ export interface EmailJobData {
 
 @Processor('notifications-email')
 export class EmailProcessor extends WorkerHost {
-  private readonly logger = new Logger(EmailProcessor.name);
+  protected readonly logger = new Logger(EmailProcessor.name);
+  protected readonly prisma: any;
+
+  private readonly base: BaseNotificationProcessorDelegate;
 
   constructor(
     @Inject(EMAIL_PROVIDER)
     private readonly emailProvider: EmailProvider,
-    @Inject('PRISMA_SERVICE')
-    private readonly prisma: any,
+    @Inject(PRISMA_SERVICE)
+    prisma: any,
   ) {
     super();
+    this.prisma = prisma;
+    this.base = new BaseNotificationProcessorDelegate(this.logger, this.prisma);
   }
 
   async process(job: Job<EmailJobData>): Promise<void> {
-    const { notificationId, to, subject, html, text, from, replyTo } =
-      job.data;
+    const { to, subject, html, text, from, replyTo } = job.data;
 
-    this.logger.log(
-      `Processing email job ${job.id} for notification ${notificationId}`,
-    );
-
-    try {
+    await this.base.processWithStatusTracking(job, 'email', async () => {
       const sendOptions: EmailSendOptions = {
         to,
         subject,
@@ -46,35 +48,22 @@ export class EmailProcessor extends WorkerHost {
       };
 
       await this.emailProvider.send(sendOptions);
+    });
+  }
+}
 
-      await this.prisma.notification.update({
-        where: { id: notificationId },
-        data: {
-          status: 'sent',
-          sentAt: new Date(),
-        },
-      });
+/**
+ * Internal delegate to reuse BaseNotificationProcessor logic inside a
+ * WorkerHost subclass (which already extends WorkerHost and cannot also
+ * extend BaseNotificationProcessor).
+ */
+class BaseNotificationProcessorDelegate extends BaseNotificationProcessor {
+  protected readonly logger: Logger;
+  protected readonly prisma: any;
 
-      this.logger.log(
-        `Email sent successfully for notification ${notificationId}`,
-      );
-    } catch (error) {
-      const failReason =
-        error instanceof Error ? error.message : 'Unknown error';
-
-      this.logger.error(
-        `Failed to send email for notification ${notificationId}: ${failReason}`,
-      );
-
-      await this.prisma.notification.update({
-        where: { id: notificationId },
-        data: {
-          status: 'failed',
-          failReason,
-        },
-      });
-
-      throw error;
-    }
+  constructor(logger: Logger, prisma: any) {
+    super();
+    this.logger = logger;
+    this.prisma = prisma;
   }
 }

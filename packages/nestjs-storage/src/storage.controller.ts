@@ -6,6 +6,7 @@ import {
   Post,
   Query,
   UploadedFile,
+  UseGuards,
   UseInterceptors,
   BadRequestException,
   Logger,
@@ -21,10 +22,13 @@ import {
 } from '@nestjs/swagger';
 
 import { StorageService } from './storage.service';
+import { StorageFeatureGuard } from './guards/feature-enabled.guard';
 import { UploadResult, GetUrlOptions } from './interfaces';
 
+/** Requires a global authentication guard (e.g., JwtAuthGuard). Guard enforcement is the consumer's responsibility. */
 @ApiTags('Storage')
 @ApiBearerAuth()
+@UseGuards(StorageFeatureGuard)
 @Controller('storage')
 export class StorageController {
   private readonly logger = new Logger(StorageController.name);

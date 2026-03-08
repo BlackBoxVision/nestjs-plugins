@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 
+import { PRISMA_SERVICE } from '@bbv/nestjs-prisma';
 import { StorageService } from './storage.service';
 import {
   StorageProvider,
@@ -61,7 +62,7 @@ describe('StorageService', () => {
         StorageService,
         { provide: STORAGE_PROVIDER, useValue: mockProvider },
         { provide: STORAGE_MODULE_OPTIONS, useValue: defaultOptions },
-        { provide: 'PRISMA_SERVICE', useValue: mockPrismaService },
+        { provide: PRISMA_SERVICE, useValue: mockPrismaService },
       ],
     }).compile();
 
@@ -169,7 +170,7 @@ describe('StorageService', () => {
           StorageService,
           { provide: STORAGE_PROVIDER, useValue: mockProvider },
           { provide: STORAGE_MODULE_OPTIONS, useValue: optionsWithTracking },
-          { provide: 'PRISMA_SERVICE', useValue: mockPrismaService },
+          { provide: PRISMA_SERVICE, useValue: mockPrismaService },
         ],
       }).compile();
 
@@ -235,7 +236,7 @@ describe('StorageService', () => {
           StorageService,
           { provide: STORAGE_PROVIDER, useValue: mockProvider },
           { provide: STORAGE_MODULE_OPTIONS, useValue: optionsWithTracking },
-          { provide: 'PRISMA_SERVICE', useValue: mockPrismaService },
+          { provide: PRISMA_SERVICE, useValue: mockPrismaService },
         ],
       }).compile();
 

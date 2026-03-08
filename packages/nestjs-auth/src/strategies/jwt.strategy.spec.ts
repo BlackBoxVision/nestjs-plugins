@@ -44,8 +44,8 @@ describe('JwtStrategy', () => {
     expect(result).toEqual({
       id: 'user-123',
       email: 'test@example.com',
-      emailVerified: true,
-      isActive: true,
+      emailVerified: false,
+      isActive: false,
     });
   });
 
@@ -106,10 +106,24 @@ describe('JwtStrategy', () => {
     expect(result.email).toBe('user@domain.com');
   });
 
-  it('should always return emailVerified as true and isActive as true', () => {
+  it('should default emailVerified and isActive to false when not in payload', () => {
     const payload = {
       sub: 'user-1',
       email: 'user@test.com',
+    };
+
+    const result = strategy.validate(payload);
+
+    expect(result.emailVerified).toBe(false);
+    expect(result.isActive).toBe(false);
+  });
+
+  it('should use emailVerified and isActive from payload when present', () => {
+    const payload = {
+      sub: 'user-1',
+      email: 'user@test.com',
+      emailVerified: true,
+      isActive: true,
     };
 
     const result = strategy.validate(payload);

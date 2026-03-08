@@ -3,35 +3,13 @@ import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
 import * as bcrypt from 'bcryptjs';
 
+import { PRISMA_SERVICE, createMockPrismaService, MockPrismaService } from '@bbv/nestjs-prisma';
 import { AuthService } from './auth.service';
 import { AUTH_MODULE_OPTIONS, AuthModuleOptions } from './interfaces';
 
 jest.mock('bcryptjs');
 
-const mockPrismaService = {
-  user: {
-    findUnique: jest.fn(),
-    create: jest.fn(),
-    update: jest.fn(),
-  },
-  account: {
-    findUnique: jest.fn(),
-    create: jest.fn(),
-    update: jest.fn(),
-  },
-  session: {
-    create: jest.fn(),
-    findUnique: jest.fn(),
-    findMany: jest.fn(),
-    delete: jest.fn(),
-  },
-  verificationToken: {
-    findUnique: jest.fn(),
-    create: jest.fn(),
-    update: jest.fn(),
-  },
-  $transaction: jest.fn(),
-};
+const mockPrismaService = createMockPrismaService();
 
 const mockJwtService = {
   sign: jest.fn().mockReturnValue('mock-jwt-token'),
@@ -59,7 +37,7 @@ describe('AuthService', () => {
       providers: [
         AuthService,
         { provide: AUTH_MODULE_OPTIONS, useValue: defaultOptions },
-        { provide: 'PRISMA_SERVICE', useValue: mockPrismaService },
+        { provide: PRISMA_SERVICE, useValue: mockPrismaService },
         { provide: JwtService, useValue: mockJwtService },
       ],
     }).compile();
@@ -96,6 +74,13 @@ describe('AuthService', () => {
             create: { provider: 'credentials' },
           },
         },
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          emailVerified: true,
+          isActive: true,
+        },
       });
     });
 
@@ -121,7 +106,7 @@ describe('AuthService', () => {
               features: { emailPassword: false },
             },
           },
-          { provide: 'PRISMA_SERVICE', useValue: mockPrismaService },
+          { provide: PRISMA_SERVICE, useValue: mockPrismaService },
           { provide: JwtService, useValue: mockJwtService },
         ],
       }).compile();
@@ -273,7 +258,7 @@ describe('AuthService', () => {
   });
 
   describe('generateToken', () => {
-    it('should generate a JWT token with correct payload', () => {
+    it('should generate a JWT token with correct payload including emailVerified and isActive', () => {
       const user = { id: 'user-1', email: 'test@example.com' };
 
       const token = service.generateToken(user);
@@ -282,6 +267,22 @@ describe('AuthService', () => {
       expect(mockJwtService.sign).toHaveBeenCalledWith({
         sub: 'user-1',
         email: 'test@example.com',
+        emailVerified: false,
+        isActive: true,
+      });
+    });
+
+    it('should include emailVerified and isActive from user when provided', () => {
+      const user = { id: 'user-1', email: 'test@example.com', role: 'admin', emailVerified: true, isActive: true };
+
+      service.generateToken(user);
+
+      expect(mockJwtService.sign).toHaveBeenCalledWith({
+        sub: 'user-1',
+        email: 'test@example.com',
+        role: 'admin',
+        emailVerified: true,
+        isActive: true,
       });
     });
   });
@@ -407,7 +408,7 @@ describe('AuthService', () => {
               features: { ...defaultOptions.features, emailPassword: false },
             },
           },
-          { provide: 'PRISMA_SERVICE', useValue: mockPrismaService },
+          { provide: PRISMA_SERVICE, useValue: mockPrismaService },
           { provide: JwtService, useValue: mockJwtService },
         ],
       }).compile();
@@ -432,7 +433,7 @@ describe('AuthService', () => {
               features: { ...defaultOptions.features, emailVerification: false },
             },
           },
-          { provide: 'PRISMA_SERVICE', useValue: mockPrismaService },
+          { provide: PRISMA_SERVICE, useValue: mockPrismaService },
           { provide: JwtService, useValue: mockJwtService },
         ],
       }).compile();
@@ -472,7 +473,7 @@ describe('AuthService', () => {
               features: { ...defaultOptions.features, passwordReset: false },
             },
           },
-          { provide: 'PRISMA_SERVICE', useValue: mockPrismaService },
+          { provide: PRISMA_SERVICE, useValue: mockPrismaService },
           { provide: JwtService, useValue: mockJwtService },
         ],
       }).compile();
@@ -497,7 +498,7 @@ describe('AuthService', () => {
               features: { ...defaultOptions.features, passwordReset: false },
             },
           },
-          { provide: 'PRISMA_SERVICE', useValue: mockPrismaService },
+          { provide: PRISMA_SERVICE, useValue: mockPrismaService },
           { provide: JwtService, useValue: mockJwtService },
         ],
       }).compile();
@@ -712,7 +713,7 @@ describe('AuthService', () => {
               features: { ...defaultOptions.features, accountLinking: false },
             },
           },
-          { provide: 'PRISMA_SERVICE', useValue: mockPrismaService },
+          { provide: PRISMA_SERVICE, useValue: mockPrismaService },
           { provide: JwtService, useValue: mockJwtService },
         ],
       }).compile();
@@ -770,7 +771,7 @@ describe('AuthService', () => {
               features: { ...defaultOptions.features, sessionManagement: false },
             },
           },
-          { provide: 'PRISMA_SERVICE', useValue: mockPrismaService },
+          { provide: PRISMA_SERVICE, useValue: mockPrismaService },
           { provide: JwtService, useValue: mockJwtService },
         ],
       }).compile();
@@ -795,7 +796,7 @@ describe('AuthService', () => {
               features: { ...defaultOptions.features, sessionManagement: false },
             },
           },
-          { provide: 'PRISMA_SERVICE', useValue: mockPrismaService },
+          { provide: PRISMA_SERVICE, useValue: mockPrismaService },
           { provide: JwtService, useValue: mockJwtService },
         ],
       }).compile();
@@ -853,7 +854,7 @@ describe('AuthService', () => {
               features: { ...defaultOptions.features, sessionManagement: false },
             },
           },
-          { provide: 'PRISMA_SERVICE', useValue: mockPrismaService },
+          { provide: PRISMA_SERVICE, useValue: mockPrismaService },
           { provide: JwtService, useValue: mockJwtService },
         ],
       }).compile();
@@ -894,6 +895,7 @@ describe('AuthService', () => {
           expiresAt: true,
         },
         orderBy: { createdAt: 'desc' },
+        take: 50,
       });
     });
   });
@@ -917,6 +919,13 @@ describe('AuthService', () => {
       });
       expect(mockPrismaService.user.findUnique).toHaveBeenCalledWith({
         where: { id: 'user-1' },
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          emailVerified: true,
+          isActive: true,
+        },
       });
     });
 

@@ -4,15 +4,17 @@ import { TemplateService } from './template.service';
 import type { NotificationModuleOptions } from '../interfaces';
 
 jest.mock('fs', () => ({
-  existsSync: jest.fn(),
-  readFileSync: jest.fn(),
+  promises: {
+    access: jest.fn(),
+    readFile: jest.fn(),
+  },
 }));
 
 jest.mock('handlebars', () => ({
   compile: jest.fn().mockReturnValue((data: any) => `rendered:${JSON.stringify(data)}`),
 }));
 
-const mockedFs = fs as jest.Mocked<typeof fs>;
+const mockedFsPromises = fs.promises as jest.Mocked<typeof fs.promises>;
 const mockedHandlebars = Handlebars as jest.Mocked<typeof Handlebars>;
 
 describe('TemplateService', () => {
@@ -53,135 +55,156 @@ describe('TemplateService', () => {
   });
 
   describe('render', () => {
-    it('should compile template with Handlebars', () => {
-      mockedFs.existsSync.mockReturnValue(false);
-      // Make the defaults dir path match
-      mockedFs.existsSync.mockImplementation((p: any) => {
-        return String(p).includes('defaults');
+    it('should compile template with Handlebars', async () => {
+      // Make the defaults dir path match via access (no throw = exists)
+      (mockedFsPromises.access as jest.Mock).mockImplementation((p: any) => {
+        if (String(p).includes('defaults')) return Promise.resolve();
+        return Promise.reject(new Error('ENOENT'));
       });
-      mockedFs.readFileSync.mockReturnValue('<h1>{{name}}</h1>' as any);
+      (mockedFsPromises.readFile as jest.Mock).mockResolvedValue('<h1>{{name}}</h1>');
 
       service = new (TemplateService as any)(createOptions());
 
-      const result = service.render('welcome', 'email', { name: 'John' });
+      const result = await service.render('welcome', 'email', { name: 'John' });
 
       expect(mockedHandlebars.compile).toHaveBeenCalledWith('<h1>{{name}}</h1>');
       expect(result).toBe('rendered:{"name":"John"}');
     });
 
-    it('should cache compiled templates', () => {
-      mockedFs.existsSync.mockImplementation((p: any) => {
-        return String(p).includes('defaults');
+    it('should cache compiled templates', async () => {
+      (mockedFsPromises.access as jest.Mock).mockImplementation((p: any) => {
+        if (String(p).includes('defaults')) return Promise.resolve();
+        return Promise.reject(new Error('ENOENT'));
       });
-      mockedFs.readFileSync.mockReturnValue('<p>{{msg}}</p>' as any);
+      (mockedFsPromises.readFile as jest.Mock).mockResolvedValue('<p>{{msg}}</p>');
 
       service = new (TemplateService as any)(createOptions());
 
-      service.render('cached', 'email', { msg: 'first' });
-      service.render('cached', 'email', { msg: 'second' });
+      await service.render('cached', 'email', { msg: 'first' });
+      await service.render('cached', 'email', { msg: 'second' });
 
       // Handlebars.compile should only be called once for the same template
       expect(mockedHandlebars.compile).toHaveBeenCalledTimes(1);
-      // readFileSync should also only be called once
-      expect(mockedFs.readFileSync).toHaveBeenCalledTimes(1);
+      // readFile should also only be called once
+      expect(mockedFsPromises.readFile).toHaveBeenCalledTimes(1);
     });
 
-    it('should not cache different templates under the same key', () => {
-      mockedFs.existsSync.mockImplementation((p: any) => {
-        return String(p).includes('defaults');
+    it('should not cache different templates under the same key', async () => {
+      (mockedFsPromises.access as jest.Mock).mockImplementation((p: any) => {
+        if (String(p).includes('defaults')) return Promise.resolve();
+        return Promise.reject(new Error('ENOENT'));
       });
-      mockedFs.readFileSync.mockReturnValue('<p>template</p>' as any);
+      (mockedFsPromises.readFile as jest.Mock).mockResolvedValue('<p>template</p>');
 
       service = new (TemplateService as any)(createOptions());
 
-      service.render('template-a', 'email', {});
-      service.render('template-b', 'email', {});
+      await service.render('template-a', 'email', {});
+      await service.render('template-b', 'email', {});
 
       expect(mockedHandlebars.compile).toHaveBeenCalledTimes(2);
     });
   });
 
   describe('loadTemplate (via render)', () => {
-    it('should load from project templateDir/channel/name.hbs first', () => {
-      mockedFs.existsSync.mockImplementation((p: any) => {
-        return String(p).includes('/custom/templates/email/welcome.hbs');
+    it('should load from project templateDir/channel/name.hbs first', async () => {
+      (mockedFsPromises.access as jest.Mock).mockImplementation((p: any) => {
+        if (String(p).includes('/custom/templates/email/welcome.hbs')) return Promise.resolve();
+        return Promise.reject(new Error('ENOENT'));
       });
-      mockedFs.readFileSync.mockReturnValue('<p>project template</p>' as any);
+      (mockedFsPromises.readFile as jest.Mock).mockResolvedValue('<p>project template</p>');
 
       service = new (TemplateService as any)(
         createOptions('/custom/templates'),
       );
 
-      service.render('welcome', 'email', {});
+      await service.render('welcome', 'email', {});
 
-      expect(mockedFs.readFileSync).toHaveBeenCalledWith(
+      expect(mockedFsPromises.readFile).toHaveBeenCalledWith(
         '/custom/templates/email/welcome.hbs',
         'utf-8',
       );
     });
 
-    it('should fall back to project templateDir/name.hbs', () => {
-      mockedFs.existsSync.mockImplementation((p: any) => {
+    it('should fall back to project templateDir/name.hbs', async () => {
+      (mockedFsPromises.access as jest.Mock).mockImplementation((p: any) => {
         const pathStr = String(p);
         // channel subdirectory does not exist, flat path does
-        if (pathStr === '/custom/templates/email/welcome.hbs') return false;
-        if (pathStr === '/custom/templates/welcome.hbs') return true;
-        return false;
+        if (pathStr === '/custom/templates/email/welcome.hbs') return Promise.reject(new Error('ENOENT'));
+        if (pathStr === '/custom/templates/welcome.hbs') return Promise.resolve();
+        return Promise.reject(new Error('ENOENT'));
       });
-      mockedFs.readFileSync.mockReturnValue('<p>flat template</p>' as any);
+      (mockedFsPromises.readFile as jest.Mock).mockResolvedValue('<p>flat template</p>');
 
       service = new (TemplateService as any)(
         createOptions('/custom/templates'),
       );
 
-      service.render('welcome', 'email', {});
+      await service.render('welcome', 'email', {});
 
-      expect(mockedFs.readFileSync).toHaveBeenCalledWith(
+      expect(mockedFsPromises.readFile).toHaveBeenCalledWith(
         '/custom/templates/welcome.hbs',
         'utf-8',
       );
     });
 
-    it('should fall back to defaults when project template not found', () => {
-      mockedFs.existsSync.mockImplementation((p: any) => {
-        return String(p).includes('defaults');
+    it('should fall back to defaults when project template not found', async () => {
+      (mockedFsPromises.access as jest.Mock).mockImplementation((p: any) => {
+        if (String(p).includes('defaults')) return Promise.resolve();
+        return Promise.reject(new Error('ENOENT'));
       });
-      mockedFs.readFileSync.mockReturnValue('<p>default</p>' as any);
+      (mockedFsPromises.readFile as jest.Mock).mockResolvedValue('<p>default</p>');
 
       service = new (TemplateService as any)(
         createOptions('/custom/templates'),
       );
 
-      service.render('welcome', 'email', {});
+      await service.render('welcome', 'email', {});
 
-      expect(mockedFs.readFileSync).toHaveBeenCalledWith(
+      expect(mockedFsPromises.readFile).toHaveBeenCalledWith(
         expect.stringContaining('defaults/welcome.hbs'),
         'utf-8',
       );
     });
 
-    it('should throw when template not found anywhere', () => {
-      mockedFs.existsSync.mockReturnValue(false);
+    it('should throw BadRequestException for path traversal in template name', async () => {
+      service = new (TemplateService as any)(createOptions('/custom/templates'));
+
+      await expect(service.render('../../../etc/passwd', 'email', {})).rejects.toThrow(
+        'path traversal is not allowed',
+      );
+    });
+
+    it('should throw BadRequestException for embedded path traversal', async () => {
+      service = new (TemplateService as any)(createOptions('/custom/templates'));
+
+      await expect(service.render('foo/../../bar', 'email', {})).rejects.toThrow(
+        'path traversal is not allowed',
+      );
+    });
+
+    it('should throw when template not found anywhere', async () => {
+      (mockedFsPromises.access as jest.Mock).mockRejectedValue(new Error('ENOENT'));
 
       service = new (TemplateService as any)(createOptions());
 
-      expect(() => service.render('nonexistent', 'email', {})).toThrow(
+      await expect(service.render('nonexistent', 'email', {})).rejects.toThrow(
         'Template "nonexistent" not found for channel "email"',
       );
     });
 
-    it('should add .hbs extension if not present', () => {
-      mockedFs.existsSync.mockImplementation((p: any) => {
-        return String(p).includes('defaults');
+    it('should add .hbs extension if not present', async () => {
+      (mockedFsPromises.access as jest.Mock).mockImplementation((p: any) => {
+        if (String(p).includes('defaults')) return Promise.resolve();
+        return Promise.reject(new Error('ENOENT'));
       });
-      mockedFs.readFileSync.mockReturnValue('<p>ext test</p>' as any);
+      (mockedFsPromises.readFile as jest.Mock).mockResolvedValue('<p>ext test</p>');
 
       service = new (TemplateService as any)(createOptions());
 
-      service.render('mytemplate', 'email', {});
+      await service.render('mytemplate', 'email', {});
 
       // The path checked should end with .hbs
-      const calls = (mockedFs.existsSync as jest.Mock).mock.calls;
+      const calls = (mockedFsPromises.access as jest.Mock).mock.calls;
       const checkedPaths = calls.map((c: any[]) => String(c[0]));
       const defaultCheck = checkedPaths.find((p: string) =>
         p.includes('defaults'),
@@ -189,17 +212,18 @@ describe('TemplateService', () => {
       expect(defaultCheck).toMatch(/mytemplate\.hbs$/);
     });
 
-    it('should not double .hbs extension when already present', () => {
-      mockedFs.existsSync.mockImplementation((p: any) => {
-        return String(p).includes('defaults');
+    it('should not double .hbs extension when already present', async () => {
+      (mockedFsPromises.access as jest.Mock).mockImplementation((p: any) => {
+        if (String(p).includes('defaults')) return Promise.resolve();
+        return Promise.reject(new Error('ENOENT'));
       });
-      mockedFs.readFileSync.mockReturnValue('<p>hbs test</p>' as any);
+      (mockedFsPromises.readFile as jest.Mock).mockResolvedValue('<p>hbs test</p>');
 
       service = new (TemplateService as any)(createOptions());
 
-      service.render('mytemplate.hbs', 'email', {});
+      await service.render('mytemplate.hbs', 'email', {});
 
-      const calls = (mockedFs.existsSync as jest.Mock).mock.calls;
+      const calls = (mockedFsPromises.access as jest.Mock).mock.calls;
       const checkedPaths = calls.map((c: any[]) => String(c[0]));
       // Should not contain .hbs.hbs
       checkedPaths.forEach((p: string) => {
@@ -209,25 +233,26 @@ describe('TemplateService', () => {
   });
 
   describe('constructor', () => {
-    it('should set projectDir when email templateDir is configured', () => {
+    it('should set projectDir when email templateDir is configured', async () => {
       service = new (TemplateService as any)(
         createOptions('/my/templates'),
       );
 
       // Verify by attempting render with project path
-      mockedFs.existsSync.mockImplementation((p: any) => {
-        return String(p).startsWith('/my/templates');
+      (mockedFsPromises.access as jest.Mock).mockImplementation((p: any) => {
+        if (String(p).startsWith('/my/templates')) return Promise.resolve();
+        return Promise.reject(new Error('ENOENT'));
       });
-      mockedFs.readFileSync.mockReturnValue('<p>test</p>' as any);
+      (mockedFsPromises.readFile as jest.Mock).mockResolvedValue('<p>test</p>');
 
-      service.render('test', 'email', {});
+      await service.render('test', 'email', {});
 
-      expect(mockedFs.existsSync).toHaveBeenCalledWith(
+      expect(mockedFsPromises.access).toHaveBeenCalledWith(
         '/my/templates/email/test.hbs',
       );
     });
 
-    it('should not set projectDir when email is disabled', () => {
+    it('should not set projectDir when email is disabled', async () => {
       const options: NotificationModuleOptions = {
         channels: {
           email: { enabled: false as const },
@@ -236,10 +261,10 @@ describe('TemplateService', () => {
 
       service = new (TemplateService as any)(options);
 
-      mockedFs.existsSync.mockReturnValue(false);
+      (mockedFsPromises.access as jest.Mock).mockRejectedValue(new Error('ENOENT'));
 
       // Should only check defaults, not any project dir
-      expect(() => service.render('test', 'email', {})).toThrow(
+      await expect(service.render('test', 'email', {})).rejects.toThrow(
         'Template "test" not found for channel "email"',
       );
     });

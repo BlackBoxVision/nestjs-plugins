@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { DeviceTokenController } from './device-token.controller';
 import { DeviceTokenService } from './device-token.service';
+import { NOTIFICATION_MODULE_OPTIONS } from '../../interfaces';
 
 describe('DeviceTokenController', () => {
   let controller: DeviceTokenController;
@@ -20,6 +21,10 @@ describe('DeviceTokenController', () => {
         {
           provide: DeviceTokenService,
           useValue: mockDeviceTokenService,
+        },
+        {
+          provide: NOTIFICATION_MODULE_OPTIONS,
+          useValue: { channels: { push: { enabled: true } }, features: {} },
         },
       ],
     }).compile();

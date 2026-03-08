@@ -1,4 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { PRISMA_SERVICE } from '@bbv/nestjs-prisma';
+import { NOTIFICATION_STATUSES, NOTIFICATION_CHANNELS } from '../../constants';
 import type { SendNotificationPayload } from '../../interfaces';
 
 export interface FindAllOptions {
@@ -12,24 +14,36 @@ export class InAppService {
   private readonly logger = new Logger(InAppService.name);
 
   constructor(
-    @Inject('PRISMA_SERVICE')
+    @Inject(PRISMA_SERVICE)
     private readonly prisma: any,
   ) {}
 
-  async create(payload: SendNotificationPayload) {
+  async create(payload: SendNotificationPayload, notificationId?: string) {
     this.logger.log(
       `Creating in-app notification for user ${payload.userId}`,
     );
 
+    // If a notification record already exists (created by NotificationService.send),
+    // update it instead of creating a duplicate.
+    if (notificationId) {
+      return this.prisma.notification.update({
+        where: { id: notificationId },
+        data: {
+          status: NOTIFICATION_STATUSES.DELIVERED,
+          sentAt: new Date(),
+        },
+      });
+    }
+
     return this.prisma.notification.create({
       data: {
         userId: payload.userId,
-        channel: 'in_app',
+        channel: NOTIFICATION_CHANNELS.IN_APP,
         type: payload.type,
         title: payload.title,
         body: payload.body,
         data: payload.data ?? undefined,
-        status: 'delivered',
+        status: NOTIFICATION_STATUSES.DELIVERED,
         sentAt: new Date(),
       },
     });
@@ -40,7 +54,7 @@ export class InAppService {
 
     const where: Record<string, unknown> = {
       userId,
-      channel: 'in_app',
+      channel: NOTIFICATION_CHANNELS.IN_APP,
     };
 
     if (status) {
@@ -71,7 +85,7 @@ export class InAppService {
     return this.prisma.notification.updateMany({
       where: {
         userId,
-        channel: 'in_app',
+        channel: NOTIFICATION_CHANNELS.IN_APP,
         readAt: null,
       },
       data: { readAt: new Date(), status: 'read' },
@@ -82,7 +96,7 @@ export class InAppService {
     return this.prisma.notification.count({
       where: {
         userId,
-        channel: 'in_app',
+        channel: NOTIFICATION_CHANNELS.IN_APP,
         readAt: null,
       },
     });

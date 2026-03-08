@@ -111,6 +111,7 @@ describe('OrganizationService', () => {
           },
         },
         orderBy: { createdAt: 'desc' },
+        take: 100,
       });
     });
 

@@ -1,6 +1,7 @@
 export { AuditLogModule } from './audit-log.module';
 export { AuditLogService } from './audit-log.service';
 export { AuditLogController } from './audit-log.controller';
+export { AuditLogFeatureGuard } from './guards/feature-enabled.guard';
 export { AuditLogQueryDto } from './dto/audit-log-query.dto';
 export {
   Audited,

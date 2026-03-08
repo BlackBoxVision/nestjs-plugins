@@ -4,6 +4,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test, TestingModule } from '@nestjs/testing';
 import * as bcrypt from 'bcryptjs';
 
+import { PRISMA_SERVICE } from '@bbv/nestjs-prisma';
 import { AuthService } from './auth.service';
 import { AUTH_MODULE_OPTIONS, AuthModuleOptions } from './interfaces';
 import { AUTH_EVENTS } from './events';
@@ -54,7 +55,7 @@ describe('AuthService - Event Emission', () => {
       providers: [
         AuthService,
         { provide: AUTH_MODULE_OPTIONS, useValue: defaultOptions },
-        { provide: 'PRISMA_SERVICE', useValue: mockPrismaService },
+        { provide: PRISMA_SERVICE, useValue: mockPrismaService },
         { provide: JwtService, useValue: mockJwtService },
         { provide: EventEmitter2, useValue: mockEventEmitter },
       ],
@@ -111,7 +112,7 @@ describe('AuthService - Event Emission', () => {
               features: { ...defaultOptions.features, emailVerification: false },
             },
           },
-          { provide: 'PRISMA_SERVICE', useValue: mockPrismaService },
+          { provide: PRISMA_SERVICE, useValue: mockPrismaService },
           { provide: JwtService, useValue: mockJwtService },
           { provide: EventEmitter2, useValue: mockEventEmitter },
         ],
@@ -223,7 +224,7 @@ describe('AuthService - Event Emission', () => {
         providers: [
           AuthService,
           { provide: AUTH_MODULE_OPTIONS, useValue: defaultOptions },
-          { provide: 'PRISMA_SERVICE', useValue: mockPrismaService },
+          { provide: PRISMA_SERVICE, useValue: mockPrismaService },
           { provide: JwtService, useValue: mockJwtService },
         ],
       }).compile();

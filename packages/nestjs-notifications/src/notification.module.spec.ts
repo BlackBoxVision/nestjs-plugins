@@ -137,6 +137,12 @@ describe('NotificationModule', () => {
           port: 6379,
           password: undefined,
         },
+        defaultJobOptions: {
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 5000 },
+          removeOnComplete: { count: 1000 },
+          removeOnFail: { count: 5000 },
+        },
       });
     });
 

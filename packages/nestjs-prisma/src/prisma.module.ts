@@ -5,11 +5,12 @@ import {
   PrismaModuleAsyncOptions,
 } from './interfaces';
 
+export const PRISMA_SERVICE = 'PRISMA_SERVICE';
 const PRISMA_MODULE_OPTIONS = 'PRISMA_MODULE_OPTIONS';
 
 function createPrismaAliases() {
   return [
-    { provide: 'PRISMA_SERVICE', useExisting: PrismaService },
+    { provide: PRISMA_SERVICE, useExisting: PrismaService },
   ];
 }
 

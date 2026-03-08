@@ -1,24 +1,23 @@
 import { Injectable, Inject, Logger } from '@nestjs/common';
-import * as bcrypt from 'bcryptjs';
-import * as crypto from 'crypto';
 
 import {
   OTP_MODULE_OPTIONS,
   OtpModuleOptions,
-  OtpProvider,
   OtpGenerateResult,
   SmsMethodConfig,
 } from '../interfaces';
+import { BaseCodeOtpProvider } from './base-code-otp.provider';
 
 @Injectable()
-export class SmsOtpProvider implements OtpProvider {
-  private readonly logger = new Logger(SmsOtpProvider.name);
+export class SmsOtpProvider extends BaseCodeOtpProvider {
+  protected readonly logger = new Logger(SmsOtpProvider.name);
   private readonly config: SmsMethodConfig;
 
   constructor(
     @Inject(OTP_MODULE_OPTIONS)
     private readonly options: OtpModuleOptions,
   ) {
+    super();
     const smsConfig = options.methods.sms;
     if (!smsConfig || !('method' in smsConfig) || smsConfig.method !== 'sms') {
       throw new Error('SMS method config is required for SmsOtpProvider');
@@ -34,26 +33,5 @@ export class SmsOtpProvider implements OtpProvider {
     const expiresAt = new Date(Date.now() + expiresInSeconds * 1000);
 
     return { code, expiresAt };
-  }
-
-  async verify(_userId: string, code: string, storedHash?: string): Promise<boolean> {
-    if (!storedHash) return false;
-
-    try {
-      return bcrypt.compare(code, storedHash);
-    } catch (error) {
-      this.logger.error('SMS OTP verification failed', error);
-      return false;
-    }
-  }
-
-  async hashCode(code: string): Promise<string> {
-    return bcrypt.hash(code, 10);
-  }
-
-  private generateNumericCode(length: number): string {
-    const max = Math.pow(10, length);
-    const randomValue = crypto.randomInt(0, max);
-    return randomValue.toString().padStart(length, '0');
   }
 }

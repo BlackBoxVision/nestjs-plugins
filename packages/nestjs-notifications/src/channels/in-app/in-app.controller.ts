@@ -5,6 +5,7 @@ import {
   Patch,
   Query,
   Req,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -14,10 +15,13 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { InAppService } from './in-app.service';
+import { InAppFeatureGuard } from '../../guards/feature-enabled.guard';
 import { NotificationQueryDto } from '../../dto/notification-query.dto';
 
+/** Requires a global authentication guard (e.g., JwtAuthGuard). Guard enforcement is the consumer's responsibility. */
 @ApiTags('Notifications')
 @ApiBearerAuth()
+@UseGuards(InAppFeatureGuard)
 @Controller('notifications')
 export class InAppController {
   constructor(private readonly inAppService: InAppService) {}

@@ -15,10 +15,13 @@ describe('PushProcessor', () => {
     };
   };
 
-  const createJob = (data: PushJobData) =>
+  const createJob = (data: PushJobData, overrides: Record<string, any> = {}) =>
     ({
       id: 'job-1',
       data,
+      attemptsMade: 0,
+      opts: { attempts: 1 },
+      ...overrides,
     }) as any;
 
   const baseJobData: PushJobData = {

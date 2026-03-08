@@ -8,13 +8,14 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 
+import { PRISMA_SERVICE } from '@bbv/nestjs-prisma';
 import { ORG_ROLES_KEY } from '../decorators/org-roles.decorator';
 
 @Injectable()
 export class OrgMemberGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
-    @Inject('PRISMA_SERVICE') private readonly prisma: any,
+    @Inject(PRISMA_SERVICE) private readonly prisma: any,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -36,6 +37,10 @@ export class OrgMemberGuard implements CanActivate {
           userId: user.id,
           organizationId: orgId,
         },
+      },
+      select: {
+        role: true,
+        organizationId: true,
       },
     });
 

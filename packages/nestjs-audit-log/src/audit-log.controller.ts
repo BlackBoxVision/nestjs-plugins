@@ -3,7 +3,7 @@ import {
   Get,
   Param,
   Query,
-  Inject,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -13,17 +13,17 @@ import {
   ApiParam,
 } from '@nestjs/swagger';
 import { AuditLogService } from './audit-log.service';
-import { AUDIT_LOG_MODULE_OPTIONS, AuditLogModuleOptions } from './interfaces';
+import { AuditLogFeatureGuard } from './guards/feature-enabled.guard';
 import { AuditLogQueryDto } from './dto/audit-log-query.dto';
 
+/** Requires a global authentication guard (e.g., JwtAuthGuard). Guard enforcement is the consumer's responsibility. */
 @ApiTags('Audit Logs')
 @ApiBearerAuth()
+@UseGuards(AuditLogFeatureGuard)
 @Controller('audit-logs')
 export class AuditLogController {
   constructor(
     private readonly auditLogService: AuditLogService,
-    @Inject(AUDIT_LOG_MODULE_OPTIONS)
-    private readonly options: AuditLogModuleOptions,
   ) {}
 
   @Get()

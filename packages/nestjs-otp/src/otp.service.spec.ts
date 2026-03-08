@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 
+import { PRISMA_SERVICE, createMockPrismaService } from '@bbv/nestjs-prisma';
 import { OtpService } from './otp.service';
 import { OTP_MODULE_OPTIONS, OtpModuleOptions } from './interfaces';
 import { OTP_EVENTS } from './events';
@@ -45,36 +46,11 @@ const defaultOptions: OtpModuleOptions = {
   },
 };
 
-const mockPrismaService = {
-  otpSecret: {
-    findUnique: jest.fn(),
-    create: jest.fn(),
-    update: jest.fn(),
-    deleteMany: jest.fn(),
-  },
-  otpBackupCode: {
-    findMany: jest.fn(),
-    create: jest.fn(),
-    update: jest.fn(),
-    deleteMany: jest.fn(),
-  },
-  otpAttempt: {
-    count: jest.fn(),
-    create: jest.fn(),
-    findFirst: jest.fn(),
-  },
-  otpCode: {
-    findMany: jest.fn(),
-    findFirst: jest.fn(),
-    create: jest.fn(),
-    update: jest.fn(),
-    deleteMany: jest.fn(),
-  },
-  $transaction: jest.fn(),
-};
+const mockPrismaService = createMockPrismaService();
 
 const mockEventEmitter = {
   emit: jest.fn(),
+  emitAsync: jest.fn().mockResolvedValue([]),
 };
 
 const mockTotpProvider = {
@@ -105,7 +81,7 @@ describe('OtpService', () => {
       providers: [
         OtpService,
         { provide: OTP_MODULE_OPTIONS, useValue: defaultOptions },
-        { provide: 'PRISMA_SERVICE', useValue: mockPrismaService },
+        { provide: PRISMA_SERVICE, useValue: mockPrismaService },
         { provide: TotpProvider, useValue: mockTotpProvider },
         { provide: SmsOtpProvider, useValue: mockSmsProvider },
         { provide: EmailOtpProvider, useValue: mockEmailProvider },
@@ -135,7 +111,7 @@ describe('OtpService', () => {
       expect(result.otpAuthUrl).toContain('otpauth://totp/');
       expect(result.qrCodeDataUrl).toContain('data:image/png');
       expect(result.backupCodes).toHaveLength(8);
-      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+      expect(mockEventEmitter.emitAsync).toHaveBeenCalledWith(
         OTP_EVENTS.TOTP_SETUP,
         expect.objectContaining({ userId: 'user-1' }),
       );
@@ -194,7 +170,7 @@ describe('OtpService', () => {
         where: { id: 'secret-1' },
         data: { isActive: true },
       });
-      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+      expect(mockEventEmitter.emitAsync).toHaveBeenCalledWith(
         OTP_EVENTS.TOTP_CONFIRMED,
         { userId: 'user-1' },
       );
@@ -239,7 +215,7 @@ describe('OtpService', () => {
 
       expect(result.success).toBe(true);
       expect(result.expiresAt).toEqual(expiresAt);
-      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+      expect(mockEventEmitter.emitAsync).toHaveBeenCalledWith(
         OTP_EVENTS.CODE_GENERATED,
         expect.objectContaining({
           userId: 'user-1',
@@ -262,7 +238,7 @@ describe('OtpService', () => {
       const result = await service.sendOtp('user-1', 'email');
 
       expect(result.success).toBe(true);
-      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+      expect(mockEventEmitter.emitAsync).toHaveBeenCalledWith(
         OTP_EVENTS.CODE_GENERATED,
         expect.objectContaining({
           userId: 'user-1',
@@ -390,7 +366,7 @@ describe('OtpService', () => {
               features: { ...defaultOptions.features, backupCodes: false },
             },
           },
-          { provide: 'PRISMA_SERVICE', useValue: mockPrismaService },
+          { provide: PRISMA_SERVICE, useValue: mockPrismaService },
           { provide: TotpProvider, useValue: mockTotpProvider },
           { provide: SmsOtpProvider, useValue: mockSmsProvider },
           { provide: EmailOtpProvider, useValue: mockEmailProvider },
@@ -422,7 +398,7 @@ describe('OtpService', () => {
 
       await service.disableMethod('user-1', 'totp', '123456');
 
-      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+      expect(mockEventEmitter.emitAsync).toHaveBeenCalledWith(
         OTP_EVENTS.DISABLED,
         { userId: 'user-1', method: 'totp' },
       );

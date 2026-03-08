@@ -3,7 +3,6 @@ import {
   Controller,
   Get,
   Post,
-  UseGuards,
 } from '@nestjs/common';
 
 import { OtpService } from './otp.service';
@@ -14,40 +13,61 @@ import {
   SendOtpDto,
   VerifyOtpDto,
 } from './dto';
+import { CurrentUser } from './decorators/current-user.decorator';
 
+/**
+ * OTP controller for managing TOTP setup, OTP send/verify, and backup codes.
+ *
+ * **Important**: This controller requires a global authentication guard (e.g., JwtAuthGuard)
+ * to be applied by the consuming application. All endpoints extract the authenticated user's
+ * ID from `req.user.id` via the `@CurrentUser()` decorator. Without an auth guard, the
+ * userId will be `undefined` and operations will fail.
+ */
 @Controller('otp')
 export class OtpController {
   constructor(private readonly otpService: OtpService) {}
 
   @Post('totp/setup')
-  async setupTotp(@Body() body: { userId: string }) {
-    return this.otpService.setupTotp(body.userId);
+  async setupTotp(@CurrentUser() userId: string) {
+    return this.otpService.setupTotp(userId);
   }
 
   @Post('totp/confirm')
-  async confirmTotp(@Body() body: ConfirmTotpDto & { userId: string }) {
-    return this.otpService.confirmTotpSetup(body.userId, body.code);
+  async confirmTotp(
+    @CurrentUser() userId: string,
+    @Body() body: ConfirmTotpDto,
+  ) {
+    return this.otpService.confirmTotpSetup(userId, body.code);
   }
 
   @Post('send')
-  async sendOtp(@Body() body: SendOtpDto & { userId: string }) {
-    return this.otpService.sendOtp(body.userId, body.method, {
+  async sendOtp(
+    @CurrentUser() userId: string,
+    @Body() body: SendOtpDto,
+  ) {
+    return this.otpService.sendOtp(userId, body.method, {
       context: body.context,
     });
   }
 
   @Post('verify')
-  async verifyOtp(@Body() body: VerifyOtpDto) {
-    return this.otpService.verifyOtp(body.userId, body.code, {
+  async verifyOtp(
+    @CurrentUser() userId: string,
+    @Body() body: VerifyOtpDto,
+  ) {
+    return this.otpService.verifyOtp(userId, body.code, {
       method: body.method,
       context: body.context,
     });
   }
 
   @Post('disable')
-  async disableOtp(@Body() body: DisableOtpDto & { userId: string }) {
+  async disableOtp(
+    @CurrentUser() userId: string,
+    @Body() body: DisableOtpDto,
+  ) {
     await this.otpService.disableMethod(
-      body.userId,
+      userId,
       body.method,
       body.verificationCode,
     );
@@ -55,17 +75,18 @@ export class OtpController {
   }
 
   @Get('methods')
-  async getMethods(@Body() body: { userId: string }) {
-    const methods = await this.otpService.getEnabledMethods(body.userId);
+  async getMethods(@CurrentUser() userId: string) {
+    const methods = await this.otpService.getEnabledMethods(userId);
     return { methods };
   }
 
   @Post('backup-codes/regenerate')
   async regenerateBackupCodes(
-    @Body() body: RegenerateBackupCodesDto & { userId: string },
+    @CurrentUser() userId: string,
+    @Body() body: RegenerateBackupCodesDto,
   ) {
     const codes = await this.otpService.regenerateBackupCodes(
-      body.userId,
+      userId,
       body.verificationCode,
     );
     return { backupCodes: codes };

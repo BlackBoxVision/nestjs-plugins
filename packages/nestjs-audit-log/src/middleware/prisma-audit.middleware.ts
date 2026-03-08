@@ -100,6 +100,16 @@ export function createAuditMiddleware(
   };
 }
 
+/**
+ * Handles UPDATE audit logging.
+ *
+ * TODO: Change tracking (old vs new values) requires a reference to the Prisma client
+ * instance to fetch the record before the update. The Prisma middleware `params` object
+ * does not expose the client, so `old` values are not available. Currently, only the
+ * new values from the update data are logged. To enable full change tracking, the
+ * consuming application would need to pass the Prisma client into the audit middleware
+ * factory, or use Prisma's `$extends` client extension API instead of middleware.
+ */
 async function handleUpdate(
   params: any,
   next: (params: any) => Promise<any>,
@@ -108,20 +118,6 @@ async function handleUpdate(
   context: AuditContext | undefined,
   excludeFields: Set<string>,
 ): Promise<any> {
-  let oldRecord: Record<string, unknown> | undefined;
-
-  try {
-    const prisma = params.__internalParams?.prisma ?? params.dataPath?.[0];
-
-    if (params.args?.where) {
-      oldRecord = await (params as any).__internalParams?.transaction
-        ? undefined
-        : undefined;
-    }
-  } catch {
-    // If we cannot fetch old record, continue without it
-  }
-
   const result = await next(params);
 
   const changes: Record<string, { old: unknown; new: unknown }> = {};
@@ -134,7 +130,7 @@ async function handleUpdate(
 
     if (newValue !== undefined) {
       changes[key] = {
-        old: oldRecord?.[key] ?? null,
+        old: null,
         new: newValue,
       };
     }

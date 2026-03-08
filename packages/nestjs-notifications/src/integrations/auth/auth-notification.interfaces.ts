@@ -19,3 +19,16 @@ export interface AuthNotificationAsyncOptions {
 }
 
 export const AUTH_NOTIFICATION_CONFIG = 'AUTH_NOTIFICATION_CONFIG';
+
+export interface UserRegisteredEvent {
+  userId: string;
+  email: string;
+  verificationToken?: string;
+}
+
+export interface ForgotPasswordEvent {
+  userId: string;
+  email: string;
+  resetToken: string;
+  expiresInSeconds: number;
+}

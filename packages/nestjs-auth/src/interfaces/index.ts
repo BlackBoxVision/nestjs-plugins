@@ -85,6 +85,8 @@ export interface JwtPayload {
   sub: string;
   email: string;
   role?: string;
+  emailVerified?: boolean;
+  isActive?: boolean;
   iat?: number;
   exp?: number;
 }

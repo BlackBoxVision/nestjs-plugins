@@ -1,9 +1,9 @@
-import { IsBoolean, IsString } from 'class-validator';
+import { IsBoolean, IsIn, IsString } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class UpsertPreferenceDto {
   @ApiProperty({ description: 'Notification channel (e.g., "email", "push", "sms")' })
-  @IsString()
+  @IsIn(['email', 'sms', 'push', 'in_app'])
   channel!: string;
 
   @ApiProperty({ description: 'Notification type (e.g., "marketing", "transactional")' })

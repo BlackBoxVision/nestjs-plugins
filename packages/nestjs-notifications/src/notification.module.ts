@@ -1,4 +1,5 @@
 import { DynamicModule, Module, Provider, Type } from '@nestjs/common';
+import { PRISMA_SERVICE } from '@bbv/nestjs-prisma';
 import { BullModule, getQueueToken } from '@nestjs/bullmq';
 import { Queue, Worker, Job } from 'bullmq';
 import {
@@ -33,6 +34,13 @@ import { FirebasePushProvider } from './channels/push/providers/firebase.provide
 import { LogSmsProvider } from './channels/sms/providers/log.provider';
 import { LogPushProvider } from './channels/push/providers/log.provider';
 import { WorkerCleanupService } from './worker-cleanup.service';
+
+const DEFAULT_JOB_OPTIONS = {
+  attempts: 3,
+  backoff: { type: 'exponential' as const, delay: 5000 },
+  removeOnComplete: { count: 1000 },
+  removeOnFail: { count: 5000 },
+};
 
 @Module({})
 export class NotificationModule {
@@ -69,11 +77,8 @@ export class NotificationModule {
         imports.push(
           BullModule.registerQueue({
             name: 'notifications-email',
-            connection: {
-              host: options.queue.redis.host,
-              port: options.queue.redis.port ?? 6379,
-              password: options.queue.redis.password,
-            },
+            connection: this.buildRedisConnection(options),
+            defaultJobOptions: DEFAULT_JOB_OPTIONS,
           }),
         );
       }
@@ -95,11 +100,8 @@ export class NotificationModule {
         imports.push(
           BullModule.registerQueue({
             name: 'notifications-sms',
-            connection: {
-              host: options.queue.redis.host,
-              port: options.queue.redis.port ?? 6379,
-              password: options.queue.redis.password,
-            },
+            connection: this.buildRedisConnection(options),
+            defaultJobOptions: DEFAULT_JOB_OPTIONS,
           }),
         );
       }
@@ -117,11 +119,8 @@ export class NotificationModule {
         imports.push(
           BullModule.registerQueue({
             name: 'notifications-push',
-            connection: {
-              host: options.queue.redis.host,
-              port: options.queue.redis.port ?? 6379,
-              password: options.queue.redis.password,
-            },
+            connection: this.buildRedisConnection(options),
+            defaultJobOptions: DEFAULT_JOB_OPTIONS,
           }),
         );
       }
@@ -224,11 +223,8 @@ export class NotificationModule {
             return null;
           }
           return new Queue('notifications-email', {
-            connection: {
-              host: options.queue.redis.host,
-              port: options.queue.redis.port ?? 6379,
-              password: options.queue.redis.password,
-            },
+            connection: this.buildRedisConnection(options),
+            defaultJobOptions: DEFAULT_JOB_OPTIONS,
           });
         },
         inject: [NOTIFICATION_MODULE_OPTIONS],
@@ -240,11 +236,8 @@ export class NotificationModule {
             return null;
           }
           return new Queue('notifications-sms', {
-            connection: {
-              host: options.queue.redis.host,
-              port: options.queue.redis.port ?? 6379,
-              password: options.queue.redis.password,
-            },
+            connection: this.buildRedisConnection(options),
+            defaultJobOptions: DEFAULT_JOB_OPTIONS,
           });
         },
         inject: [NOTIFICATION_MODULE_OPTIONS],
@@ -256,11 +249,8 @@ export class NotificationModule {
             return null;
           }
           return new Queue('notifications-push', {
-            connection: {
-              host: options.queue.redis.host,
-              port: options.queue.redis.port ?? 6379,
-              password: options.queue.redis.password,
-            },
+            connection: this.buildRedisConnection(options),
+            defaultJobOptions: DEFAULT_JOB_OPTIONS,
           });
         },
         inject: [NOTIFICATION_MODULE_OPTIONS],
@@ -282,15 +272,11 @@ export class NotificationModule {
             'notifications-email',
             async (job: Job) => processor.process(job),
             {
-              connection: {
-                host: options.queue.redis.host,
-                port: options.queue.redis.port ?? 6379,
-                password: options.queue.redis.password,
-              },
+              connection: this.buildRedisConnection(options),
             },
           );
         },
-        inject: [NOTIFICATION_MODULE_OPTIONS, EMAIL_PROVIDER, 'PRISMA_SERVICE'],
+        inject: [NOTIFICATION_MODULE_OPTIONS, EMAIL_PROVIDER, PRISMA_SERVICE],
       },
       {
         provide: SMS_WORKER,
@@ -307,15 +293,11 @@ export class NotificationModule {
             'notifications-sms',
             async (job: Job) => processor.process(job),
             {
-              connection: {
-                host: options.queue.redis.host,
-                port: options.queue.redis.port ?? 6379,
-                password: options.queue.redis.password,
-              },
+              connection: this.buildRedisConnection(options),
             },
           );
         },
-        inject: [NOTIFICATION_MODULE_OPTIONS, SMS_PROVIDER, 'PRISMA_SERVICE'],
+        inject: [NOTIFICATION_MODULE_OPTIONS, SMS_PROVIDER, PRISMA_SERVICE],
       },
       {
         provide: PUSH_WORKER,
@@ -332,15 +314,11 @@ export class NotificationModule {
             'notifications-push',
             async (job: Job) => processor.process(job),
             {
-              connection: {
-                host: options.queue.redis.host,
-                port: options.queue.redis.port ?? 6379,
-                password: options.queue.redis.password,
-              },
+              connection: this.buildRedisConnection(options),
             },
           );
         },
-        inject: [NOTIFICATION_MODULE_OPTIONS, PUSH_PROVIDER, 'PRISMA_SERVICE'],
+        inject: [NOTIFICATION_MODULE_OPTIONS, PUSH_PROVIDER, PRISMA_SERVICE],
       },
       WorkerCleanupService,
     ];
@@ -361,6 +339,15 @@ export class NotificationModule {
         TemplateService,
       ],
       global: asyncOptions.isGlobal ?? false,
+    };
+  }
+
+  private static buildRedisConnection(options: NotificationModuleOptions) {
+    const redis = options.queue!.redis!;
+    return {
+      host: redis.host,
+      port: redis.port ?? 6379,
+      password: redis.password,
     };
   }
 

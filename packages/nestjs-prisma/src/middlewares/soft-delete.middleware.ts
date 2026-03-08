@@ -28,11 +28,26 @@ type MiddlewareFn = (
   next: (params: MiddlewareParams) => Promise<unknown>,
 ) => Promise<unknown>;
 
-export function softDeleteMiddleware(): MiddlewareFn {
+export interface SoftDeleteMiddlewareOptions {
+  /** Optional list of model names to apply soft-delete logic to.
+   *  When omitted, soft-delete applies to all models. */
+  models?: string[];
+}
+
+export function softDeleteMiddleware(
+  options?: SoftDeleteMiddlewareOptions,
+): MiddlewareFn {
+  const models = options?.models;
+
   return async (
     params: MiddlewareParams,
     next: (params: MiddlewareParams) => Promise<unknown>,
   ) => {
+    // If models are specified, only apply soft-delete to those models
+    if (models && (!params.model || !models.includes(params.model))) {
+      return next(params);
+    }
+
     // Convert delete to soft delete (update with deletedAt)
     if (params.action === 'delete') {
       params.action = 'update';

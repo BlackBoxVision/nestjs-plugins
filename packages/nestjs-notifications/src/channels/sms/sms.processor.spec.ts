@@ -15,10 +15,13 @@ describe('SmsProcessor', () => {
     };
   };
 
-  const createJob = (data: SmsJobData) =>
+  const createJob = (data: SmsJobData, overrides: Record<string, any> = {}) =>
     ({
       id: 'job-1',
       data,
+      attemptsMade: 0,
+      opts: { attempts: 1 },
+      ...overrides,
     }) as any;
 
   const baseJobData: SmsJobData = {

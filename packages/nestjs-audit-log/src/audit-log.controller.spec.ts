@@ -1,12 +1,10 @@
 import { AuditLogController } from './audit-log.controller';
 import { AuditLogService } from './audit-log.service';
-import { AuditLogModuleOptions } from './interfaces';
 import { AuditLogQueryDto } from './dto/audit-log-query.dto';
 
 describe('AuditLogController', () => {
   let controller: AuditLogController;
   let mockAuditLogService: jest.Mocked<Pick<AuditLogService, 'findAll' | 'findById' | 'findByEntity'>>;
-  let mockOptions: AuditLogModuleOptions;
 
   beforeEach(() => {
     mockAuditLogService = {
@@ -21,14 +19,8 @@ describe('AuditLogController', () => {
       findByEntity: jest.fn().mockResolvedValue([]),
     };
 
-    mockOptions = {
-      features: { registerController: true },
-      adminRoles: ['ADMIN'],
-    };
-
     controller = new AuditLogController(
       mockAuditLogService as any,
-      mockOptions,
     );
   });
 
@@ -53,7 +45,7 @@ describe('AuditLogController', () => {
         action: undefined,
         startDate: undefined,
         endDate: undefined,
-        page: 0,
+        page: 1,
         limit: 10,
       });
     });
@@ -80,7 +72,7 @@ describe('AuditLogController', () => {
         action: 'UPDATE',
         startDate: new Date(startDate),
         endDate: new Date(endDate),
-        page: 2,
+        page: 3,
         limit: 10,
       });
     });
@@ -99,7 +91,7 @@ describe('AuditLogController', () => {
         action: 'CREATE',
         startDate: undefined,
         endDate: undefined,
-        page: 1,
+        page: 2,
         limit: 10,
       });
     });

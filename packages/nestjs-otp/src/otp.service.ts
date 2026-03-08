@@ -9,6 +9,7 @@ import {
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import * as bcrypt from 'bcryptjs';
 
+import { PRISMA_SERVICE } from '@bbv/nestjs-prisma';
 import {
   OTP_MODULE_OPTIONS,
   OtpModuleOptions,
@@ -28,7 +29,7 @@ export class OtpService {
   constructor(
     @Inject(OTP_MODULE_OPTIONS)
     private readonly options: OtpModuleOptions,
-    @Inject('PRISMA_SERVICE')
+    @Inject(PRISMA_SERVICE)
     prisma: any,
     @Optional()
     private readonly totpProvider?: TotpProvider,
@@ -92,7 +93,7 @@ export class OtpService {
       ]);
     }
 
-    this.emitEvent(OTP_EVENTS.TOTP_SETUP, {
+    await this.emitEvent(OTP_EVENTS.TOTP_SETUP, {
       userId,
       otpAuthUrl: setup.otpAuthUrl,
       qrCodeDataUrl: setup.qrCodeDataUrl,
@@ -134,7 +135,7 @@ export class OtpService {
     );
 
     if (!isValid) {
-      this.emitEvent(OTP_EVENTS.FAILED, {
+      await this.emitEvent(OTP_EVENTS.FAILED, {
         userId,
         method: 'totp',
         reason: 'invalid_code',
@@ -147,7 +148,7 @@ export class OtpService {
       data: { isActive: true },
     });
 
-    this.emitEvent(OTP_EVENTS.TOTP_CONFIRMED, { userId });
+    await this.emitEvent(OTP_EVENTS.TOTP_CONFIRMED, { userId });
 
     return { success: true };
   }
@@ -164,9 +165,7 @@ export class OtpService {
       throw new ForbiddenException(`${method} OTP is not enabled`);
     }
 
-    if (this.isFeatureEnabled('rateLimiting')) {
-      await this.checkRateLimit(userId, method);
-    }
+    await this.checkRateLimit(userId, method);
 
     const result = await provider.generate(userId, options?.context);
     const codeHash = await provider.hashCode(result.code);
@@ -181,7 +180,7 @@ export class OtpService {
       },
     });
 
-    this.emitEvent(OTP_EVENTS.CODE_GENERATED, {
+    await this.emitEvent(OTP_EVENTS.CODE_GENERATED, {
       userId,
       method,
       code: result.code,
@@ -197,15 +196,13 @@ export class OtpService {
     code: string,
     options?: { method?: 'totp' | 'sms' | 'email' | 'backup'; context?: string },
   ): Promise<OtpVerifyResult> {
-    if (this.isFeatureEnabled('rateLimiting')) {
-      await this.checkRateLimit(userId, options?.method ?? 'any');
-    }
+    await this.checkRateLimit(userId, options?.method ?? 'any');
 
     if (options?.method === 'backup') {
       const success = await this.verifyBackupCode(userId, code);
       await this.recordAttempt(userId, 'backup', success);
       if (success) {
-        this.emitEvent(OTP_EVENTS.VERIFIED, {
+        await this.emitEvent(OTP_EVENTS.VERIFIED, {
           userId,
           method: 'backup',
           context: options?.context,
@@ -218,7 +215,7 @@ export class OtpService {
       const success = await this.verifyTotp(userId, code);
       if (success) {
         await this.recordAttempt(userId, 'totp', true);
-        this.emitEvent(OTP_EVENTS.VERIFIED, {
+        await this.emitEvent(OTP_EVENTS.VERIFIED, {
           userId,
           method: 'totp',
           context: options?.context,
@@ -227,7 +224,7 @@ export class OtpService {
       }
       if (options?.method === 'totp') {
         await this.recordAttempt(userId, 'totp', false);
-        this.emitEvent(OTP_EVENTS.FAILED, {
+        await this.emitEvent(OTP_EVENTS.FAILED, {
           userId,
           method: 'totp',
           reason: 'invalid_code',
@@ -246,7 +243,7 @@ export class OtpService {
       const success = await this.verifyCodeOtp(userId, code, method, options?.context);
       if (success.success) {
         await this.recordAttempt(userId, success.method, true);
-        this.emitEvent(OTP_EVENTS.VERIFIED, {
+        await this.emitEvent(OTP_EVENTS.VERIFIED, {
           userId,
           method: success.method,
           context: options?.context,
@@ -256,7 +253,7 @@ export class OtpService {
     }
 
     await this.recordAttempt(userId, options?.method ?? 'unknown', false);
-    this.emitEvent(OTP_EVENTS.FAILED, {
+    await this.emitEvent(OTP_EVENTS.FAILED, {
       userId,
       method: options?.method ?? 'unknown',
       reason: 'invalid_code',
@@ -331,7 +328,7 @@ export class OtpService {
 
     const codes = await this.generateBackupCodes(userId);
 
-    this.emitEvent(OTP_EVENTS.BACKUP_CODES_REGENERATED, { userId });
+    await this.emitEvent(OTP_EVENTS.BACKUP_CODES_REGENERATED, { userId });
 
     return codes;
   }
@@ -359,31 +356,34 @@ export class OtpService {
       });
     }
 
-    this.emitEvent(OTP_EVENTS.DISABLED, { userId, method });
+    await this.emitEvent(OTP_EVENTS.DISABLED, { userId, method });
   }
 
   async getEnabledMethods(userId: string): Promise<string[]> {
+    const [otpSecret, recentSmsCode, recentEmailCode] = await Promise.all([
+      this.prisma.otpSecret.findUnique({
+        where: { userId_method: { userId, method: 'totp' } },
+      }),
+      this.prisma.otpCode.findFirst({
+        where: { userId, method: 'sms' },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.otpCode.findFirst({
+        where: { userId, method: 'email' },
+        orderBy: { createdAt: 'desc' },
+      }),
+    ]);
+
     const methods: string[] = [];
 
-    const otpSecret = await this.prisma.otpSecret.findUnique({
-      where: { userId_method: { userId, method: 'totp' } },
-    });
     if (otpSecret?.isActive) {
       methods.push('totp');
     }
 
-    const recentSmsCode = await this.prisma.otpCode.findFirst({
-      where: { userId, method: 'sms' },
-      orderBy: { createdAt: 'desc' },
-    });
     if (recentSmsCode && this.isMethodEnabled('sms')) {
       methods.push('sms');
     }
 
-    const recentEmailCode = await this.prisma.otpCode.findFirst({
-      where: { userId, method: 'email' },
-      orderBy: { createdAt: 'desc' },
-    });
     if (recentEmailCode && this.isMethodEnabled('email')) {
       methods.push('email');
     }
@@ -447,7 +447,9 @@ export class OtpService {
     return { success: false, method: method ?? 'unknown' };
   }
 
-  private async checkRateLimit(userId: string, method: string): Promise<void> {
+  async checkRateLimit(userId: string, method: string): Promise<void> {
+    if (!this.isFeatureEnabled('rateLimiting')) return;
+
     const config = this.options.rateLimiting;
     const maxAttempts = config?.maxAttempts ?? 5;
     const windowSeconds = config?.windowSeconds ?? 300;
@@ -479,7 +481,7 @@ export class OtpService {
           lastAttempt.createdAt.getTime() + lockoutSeconds * 1000,
         );
         if (new Date() < lockoutEnd) {
-          this.emitEvent(OTP_EVENTS.FAILED, {
+          await this.emitEvent(OTP_EVENTS.FAILED, {
             userId,
             method,
             reason: 'rate_limited',
@@ -517,9 +519,16 @@ export class OtpService {
     return this.options.features?.[feature] !== false;
   }
 
-  private emitEvent(event: string, payload: Record<string, unknown>): void {
+  private async emitEvent(event: string, payload: Record<string, unknown>): Promise<void> {
     if (this.eventEmitter) {
-      this.eventEmitter.emit(event, payload);
+      try {
+        await this.eventEmitter.emitAsync(event, payload);
+      } catch (error) {
+        this.logger.error(
+          `Failed to emit event ${event}: ${error instanceof Error ? error.message : String(error)}`,
+          error instanceof Error ? error.stack : undefined,
+        );
+      }
     }
   }
 }

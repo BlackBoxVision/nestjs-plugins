@@ -15,10 +15,13 @@ describe('EmailProcessor', () => {
     };
   };
 
-  const createJob = (data: EmailJobData) =>
+  const createJob = (data: EmailJobData, overrides: Record<string, any> = {}) =>
     ({
       id: 'job-1',
       data,
+      attemptsMade: 0,
+      opts: { attempts: 1 },
+      ...overrides,
     }) as any;
 
   const baseJobData: EmailJobData = {

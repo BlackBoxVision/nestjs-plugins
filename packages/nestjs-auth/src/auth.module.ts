@@ -65,7 +65,6 @@ export class AuthModule {
         ...(asyncOptions.imports ?? []),
         PassportModule.register({ defaultStrategy: 'jwt' }),
         JwtModule.registerAsync({
-          imports: asyncOptions.imports,
           useFactory: async (...args: any[]) => {
             const options = await asyncOptions.useFactory(...args);
             return {
@@ -76,6 +75,7 @@ export class AuthModule {
             };
           },
           inject: asyncOptions.inject ?? [],
+          imports: asyncOptions.imports ?? [],
         }),
       ],
       controllers: [AuthController, OrganizationController],

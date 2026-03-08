@@ -9,6 +9,9 @@ export { InAppService } from './channels/in-app/in-app.service';
 export type { FindAllOptions } from './channels/in-app/in-app.service';
 export { InAppController } from './channels/in-app/in-app.controller';
 
+// Base processor
+export { BaseNotificationProcessor } from './channels/base.processor';
+
 // Email providers
 export { SmtpEmailProvider } from './channels/email/providers/smtp.provider';
 export { SendGridEmailProvider } from './channels/email/providers/sendgrid.provider';
@@ -39,10 +42,24 @@ export { TemplateService } from './templates/template.service';
 // Worker cleanup
 export { WorkerCleanupService } from './worker-cleanup.service';
 
+// Guards
+export {
+  InAppFeatureGuard,
+  PushFeatureGuard,
+  PreferencesFeatureGuard,
+} from './guards/feature-enabled.guard';
+
 // DTOs
 export { NotificationQueryDto } from './dto/notification-query.dto';
 export { UpsertPreferenceDto } from './dto/upsert-preference.dto';
 export { RegisterDeviceDto } from './dto/register-device.dto';
+
+// Constants
+export {
+  NOTIFICATION_STATUSES,
+  NOTIFICATION_CHANNELS,
+} from './constants';
+export type { NotificationStatus, NotificationChannel } from './constants';
 
 // Interfaces and constants
 export {

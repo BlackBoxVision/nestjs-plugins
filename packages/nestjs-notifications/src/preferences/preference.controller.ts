@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Put, Req } from '@nestjs/common';
+import { Body, Controller, Get, Put, Req, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -6,10 +6,13 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { PreferenceService } from './preference.service';
+import { PreferencesFeatureGuard } from '../guards/feature-enabled.guard';
 import { UpsertPreferenceDto } from '../dto/upsert-preference.dto';
 
+/** Requires a global authentication guard (e.g., JwtAuthGuard). Guard enforcement is the consumer's responsibility. */
 @ApiTags('Notification Preferences')
 @ApiBearerAuth()
+@UseGuards(PreferencesFeatureGuard)
 @Controller('notification-preferences')
 export class PreferenceController {
   constructor(private readonly preferenceService: PreferenceService) {}

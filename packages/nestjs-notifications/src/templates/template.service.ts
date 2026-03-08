@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import * as Handlebars from 'handlebars';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -11,6 +11,7 @@ import {
 export class TemplateService {
   private readonly logger = new Logger(TemplateService.name);
   private readonly cache = new Map<string, HandlebarsTemplateDelegate>();
+  private readonly maxCacheSize = 100;
   private readonly defaultsDir: string;
   private readonly projectDir: string | undefined;
 
@@ -26,25 +27,41 @@ export class TemplateService {
     }
   }
 
-  render(
+  async render(
     templateName: string,
     channel: string,
     data: Record<string, unknown>,
-  ): string {
+  ): Promise<string> {
     const cacheKey = `${channel}:${templateName}`;
 
     let compiledTemplate = this.cache.get(cacheKey);
 
     if (!compiledTemplate) {
-      const source = this.loadTemplate(templateName, channel);
+      const source = await this.loadTemplate(templateName, channel);
       compiledTemplate = Handlebars.compile(source);
+
+      // FIFO eviction when cache exceeds max size
+      if (this.cache.size >= this.maxCacheSize) {
+        const oldestKey = this.cache.keys().next().value;
+        if (oldestKey !== undefined) {
+          this.cache.delete(oldestKey);
+        }
+      }
+
       this.cache.set(cacheKey, compiledTemplate);
     }
 
     return compiledTemplate(data);
   }
 
-  private loadTemplate(templateName: string, channel: string): string {
+  private async loadTemplate(templateName: string, channel: string): Promise<string> {
+    // Reject template names containing path traversal sequences
+    if (templateName.includes('..')) {
+      throw new BadRequestException(
+        `Invalid template name "${templateName}": path traversal is not allowed`,
+      );
+    }
+
     // Resolution order: project templateDir -> built-in defaults
     const fileName = templateName.endsWith('.hbs')
       ? templateName
@@ -52,34 +69,50 @@ export class TemplateService {
 
     if (this.projectDir) {
       const projectPath = path.join(this.projectDir, channel, fileName);
-      if (fs.existsSync(projectPath)) {
+      const resolvedProjectPath = path.resolve(projectPath);
+      const resolvedProjectDir = path.resolve(this.projectDir);
+
+      if (!resolvedProjectPath.startsWith(resolvedProjectDir + path.sep) && resolvedProjectPath !== resolvedProjectDir) {
+        throw new BadRequestException(
+          `Invalid template path: resolved path escapes the template directory`,
+        );
+      }
+
+      try {
+        await fs.promises.access(projectPath);
         this.logger.debug(
           `Loading template from project dir: ${projectPath}`,
         );
-        return fs.readFileSync(projectPath, 'utf-8');
+        return await fs.promises.readFile(projectPath, 'utf-8');
+      } catch {
+        // File not found, continue to next resolution path
       }
 
       // Also check without channel subdirectory
       const projectPathFlat = path.join(this.projectDir, fileName);
-      if (fs.existsSync(projectPathFlat)) {
+      try {
+        await fs.promises.access(projectPathFlat);
         this.logger.debug(
           `Loading template from project dir: ${projectPathFlat}`,
         );
-        return fs.readFileSync(projectPathFlat, 'utf-8');
+        return await fs.promises.readFile(projectPathFlat, 'utf-8');
+      } catch {
+        // File not found, continue to defaults
       }
     }
 
     // Fall back to built-in defaults
     const defaultPath = path.join(this.defaultsDir, fileName);
-    if (fs.existsSync(defaultPath)) {
+    try {
+      await fs.promises.access(defaultPath);
       this.logger.debug(
         `Loading template from defaults: ${defaultPath}`,
       );
-      return fs.readFileSync(defaultPath, 'utf-8');
+      return await fs.promises.readFile(defaultPath, 'utf-8');
+    } catch {
+      throw new Error(
+        `Template "${templateName}" not found for channel "${channel}"`,
+      );
     }
-
-    throw new Error(
-      `Template "${templateName}" not found for channel "${channel}"`,
-    );
   }
 }

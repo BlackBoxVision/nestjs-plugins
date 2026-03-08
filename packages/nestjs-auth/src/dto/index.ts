@@ -53,19 +53,6 @@ export class VerifyEmailDto {
   token!: string;
 }
 
-export class ChangePasswordDto {
-  @ApiProperty({ description: 'Current account password', example: 'OldP@ssw0rd!' })
-  @IsString()
-  @IsNotEmpty()
-  currentPassword!: string;
-
-  @ApiProperty({ description: 'New password to set', example: 'N3wP@ssw0rd!', minLength: 8 })
-  @IsString()
-  @MinLength(8)
-  @IsNotEmpty()
-  newPassword!: string;
-}
-
 export class TwoFactorVerifyDto {
   @ApiProperty({ description: 'Challenge token from the 2FA initiation response' })
   @IsString()

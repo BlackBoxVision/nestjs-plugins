@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getQueueToken } from '@nestjs/bullmq';
+import { PRISMA_SERVICE, createMockPrismaService } from '@bbv/nestjs-prisma';
 import { NotificationService } from './notification.service';
 import { InAppService } from './channels/in-app/in-app.service';
 import { DeviceTokenService } from './channels/push/device-token.service';
@@ -58,12 +59,9 @@ describe('NotificationService', () => {
   };
 
   beforeEach(async () => {
-    mockPrisma = {
-      notification: {
-        create: jest.fn().mockResolvedValue({ id: 'notif-1' }),
-        update: jest.fn().mockResolvedValue({}),
-      },
-    };
+    mockPrisma = createMockPrismaService();
+    mockPrisma.notification.create.mockResolvedValue({ id: 'notif-1' });
+    mockPrisma.notification.update.mockResolvedValue({});
 
     mockEmailQueue = {
       add: jest.fn().mockResolvedValue({ id: 'job-email-1' }),
@@ -109,7 +107,7 @@ describe('NotificationService', () => {
           useValue: defaultOptions,
         },
         {
-          provide: 'PRISMA_SERVICE',
+          provide: PRISMA_SERVICE,
           useValue: mockPrisma,
         },
         {
@@ -190,6 +188,9 @@ describe('NotificationService', () => {
         to: 'user@example.com',
         subject: 'Welcome',
         html: '<p>Hello</p>',
+      }, {
+        removeOnComplete: { count: 1000 },
+        removeOnFail: { count: 5000 },
       });
     });
 
@@ -205,7 +206,7 @@ describe('NotificationService', () => {
       const result = await service.send(payload);
 
       expect(result).toEqual({ id: 'notif-1' });
-      expect(mockInAppService.create).toHaveBeenCalledWith(payload);
+      expect(mockInAppService.create).toHaveBeenCalledWith(payload, 'notif-1');
     });
 
     it('should route SMS notifications to the SMS queue', async () => {
@@ -225,6 +226,9 @@ describe('NotificationService', () => {
         notificationId: 'notif-1',
         to: '+1987654321',
         body: 'Your code is 123456',
+      }, {
+        removeOnComplete: { count: 1000 },
+        removeOnFail: { count: 5000 },
       });
     });
 
@@ -285,7 +289,7 @@ describe('NotificationService', () => {
         providers: [
           NotificationService,
           { provide: NOTIFICATION_MODULE_OPTIONS, useValue: disabledOptions },
-          { provide: 'PRISMA_SERVICE', useValue: mockPrisma },
+          { provide: PRISMA_SERVICE, useValue: mockPrisma },
           { provide: getQueueToken('notifications-email'), useValue: mockEmailQueue },
           { provide: getQueueToken('notifications-sms'), useValue: mockSmsQueue },
           { provide: getQueueToken('notifications-push'), useValue: mockPushQueue },
@@ -346,6 +350,9 @@ describe('NotificationService', () => {
         title: 'New Alert',
         body: 'Something happened',
         data: undefined,
+      }, {
+        removeOnComplete: { count: 1000 },
+        removeOnFail: { count: 5000 },
       });
       expect(mockPushQueue.add).toHaveBeenCalledWith('send', {
         notificationId: 'notif-1',
@@ -353,6 +360,9 @@ describe('NotificationService', () => {
         title: 'New Alert',
         body: 'Something happened',
         data: undefined,
+      }, {
+        removeOnComplete: { count: 1000 },
+        removeOnFail: { count: 5000 },
       });
     });
 
@@ -377,6 +387,9 @@ describe('NotificationService', () => {
         title: 'New Alert',
         body: 'Something happened',
         data: undefined,
+      }, {
+        removeOnComplete: { count: 1000 },
+        removeOnFail: { count: 5000 },
       });
     });
 
@@ -393,7 +406,7 @@ describe('NotificationService', () => {
         providers: [
           NotificationService,
           { provide: NOTIFICATION_MODULE_OPTIONS, useValue: disabledOptions },
-          { provide: 'PRISMA_SERVICE', useValue: mockPrisma },
+          { provide: PRISMA_SERVICE, useValue: mockPrisma },
           { provide: getQueueToken('notifications-email'), useValue: mockEmailQueue },
           { provide: getQueueToken('notifications-sms'), useValue: mockSmsQueue },
           { provide: getQueueToken('notifications-push'), useValue: mockPushQueue },

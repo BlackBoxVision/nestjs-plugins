@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { InAppController } from './in-app.controller';
 import { InAppService } from './in-app.service';
 import { NotificationQueryDto } from '../../dto/notification-query.dto';
+import { NOTIFICATION_MODULE_OPTIONS } from '../../interfaces';
 
 describe('InAppController', () => {
   let controller: InAppController;
@@ -21,6 +22,10 @@ describe('InAppController', () => {
         {
           provide: InAppService,
           useValue: mockInAppService,
+        },
+        {
+          provide: NOTIFICATION_MODULE_OPTIONS,
+          useValue: { channels: { inApp: { enabled: true } }, features: {} },
         },
       ],
     }).compile();

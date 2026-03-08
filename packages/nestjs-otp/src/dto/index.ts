@@ -1,9 +1,5 @@
 import { IsNotEmpty, IsOptional, IsString, IsIn } from 'class-validator';
 
-export class SetupTotpDto {
-  // No body needed — userId comes from JWT
-}
-
 export class ConfirmTotpDto {
   @IsString()
   @IsNotEmpty()
@@ -33,10 +29,6 @@ export class VerifyOtpDto {
   @IsString()
   @IsOptional()
   context?: string;
-
-  @IsString()
-  @IsNotEmpty()
-  userId!: string;
 }
 
 export class DisableOtpDto {

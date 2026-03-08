@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PreferenceController } from './preference.controller';
 import { PreferenceService } from './preference.service';
+import { NOTIFICATION_MODULE_OPTIONS } from '../interfaces';
 
 describe('PreferenceController', () => {
   let controller: PreferenceController;
@@ -18,6 +19,10 @@ describe('PreferenceController', () => {
         {
           provide: PreferenceService,
           useValue: mockPreferenceService,
+        },
+        {
+          provide: NOTIFICATION_MODULE_OPTIONS,
+          useValue: { channels: {}, features: { preferences: true } },
         },
       ],
     }).compile();

@@ -31,8 +31,8 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       id: payload.sub,
       email: payload.email,
       role: payload.role,
-      emailVerified: true,
-      isActive: true,
+      emailVerified: payload.emailVerified ?? false,
+      isActive: payload.isActive ?? false,
     };
   }
 }

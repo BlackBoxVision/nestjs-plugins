@@ -6,6 +6,7 @@ import {
   Param,
   Post,
   Req,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -15,10 +16,13 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { DeviceTokenService } from './device-token.service';
+import { PushFeatureGuard } from '../../guards/feature-enabled.guard';
 import { RegisterDeviceDto } from '../../dto/register-device.dto';
 
+/** Requires a global authentication guard (e.g., JwtAuthGuard). Guard enforcement is the consumer's responsibility. */
 @ApiTags('Device Tokens')
 @ApiBearerAuth()
+@UseGuards(PushFeatureGuard)
 @Controller('notifications/devices')
 export class DeviceTokenController {
   constructor(private readonly deviceTokenService: DeviceTokenService) {}

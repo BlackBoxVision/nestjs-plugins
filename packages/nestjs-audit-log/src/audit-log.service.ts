@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { PRISMA_SERVICE } from '@bbv/nestjs-prisma';
 import {
   AuditLogEntry,
   AuditLogModuleOptions,
@@ -11,7 +12,7 @@ export class AuditLogService {
   private readonly logger = new Logger(AuditLogService.name);
 
   constructor(
-    @Inject('PRISMA_SERVICE') private readonly prisma: any,
+    @Inject(PRISMA_SERVICE) private readonly prisma: any,
     @Inject(AUDIT_LOG_MODULE_OPTIONS)
     private readonly options: AuditLogModuleOptions,
   ) {}
@@ -108,6 +109,7 @@ export class AuditLogService {
     return this.prisma.auditLog.findMany({
       where: { entity, entityId },
       orderBy: { createdAt: 'desc' },
+      take: 50,
     });
   }
 

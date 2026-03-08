@@ -1,11 +1,12 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { PRISMA_SERVICE } from '@bbv/nestjs-prisma';
 
 @Injectable()
 export class PreferenceService {
   private readonly logger = new Logger(PreferenceService.name);
 
   constructor(
-    @Inject('PRISMA_SERVICE')
+    @Inject(PRISMA_SERVICE)
     private readonly prisma: any,
   ) {}
 

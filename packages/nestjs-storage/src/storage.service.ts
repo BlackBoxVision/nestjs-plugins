@@ -1,5 +1,6 @@
-import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import * as mimeTypes from 'mime-types';
+import { PRISMA_SERVICE } from '@bbv/nestjs-prisma';
 
 import {
   StorageProvider,
@@ -21,7 +22,7 @@ export class StorageService {
     @Inject(STORAGE_MODULE_OPTIONS)
     private readonly options: StorageModuleOptions,
     @Optional()
-    @Inject('PRISMA_SERVICE')
+    @Inject(PRISMA_SERVICE)
     private readonly prismaService?: any,
   ) {}
 
@@ -86,7 +87,7 @@ export class StorageService {
       this.options.maxFileSize &&
       file.size > this.options.maxFileSize
     ) {
-      throw new Error(
+      throw new BadRequestException(
         `File size ${file.size} exceeds maximum allowed size of ${this.options.maxFileSize} bytes`,
       );
     }
@@ -99,7 +100,7 @@ export class StorageService {
         file.mimetype || mimeTypes.lookup(file.originalname) || '';
 
       if (!this.options.allowedMimeTypes.includes(mimeType)) {
-        throw new Error(
+        throw new BadRequestException(
           `File type "${mimeType}" is not allowed. Allowed types: ${this.options.allowedMimeTypes.join(', ')}`,
         );
       }

@@ -19,6 +19,9 @@ export { FirebaseStorageProvider } from './providers/firebase.provider';
 export { DOSpacesStorageProvider } from './providers/do-spaces.provider';
 export { LocalStorageProvider } from './providers/local.provider';
 
+// Guards
+export { StorageFeatureGuard } from './guards/feature-enabled.guard';
+
 // Decorators
 export {
   ImageUpload,

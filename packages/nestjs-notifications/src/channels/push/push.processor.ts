@@ -1,8 +1,10 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Inject, Logger } from '@nestjs/common';
+import { PRISMA_SERVICE } from '@bbv/nestjs-prisma';
 import type { Job } from 'bullmq';
 import type { PushProvider, PushSendOptions } from '../../interfaces';
 import { PUSH_PROVIDER } from '../../interfaces';
+import { BaseNotificationProcessor } from '../base.processor';
 
 export interface PushJobData {
   notificationId: string;
@@ -17,26 +19,26 @@ export interface PushJobData {
 
 @Processor('notifications-push')
 export class PushProcessor extends WorkerHost {
-  private readonly logger = new Logger(PushProcessor.name);
+  protected readonly logger = new Logger(PushProcessor.name);
+  protected readonly prisma: any;
+
+  private readonly base: BaseNotificationProcessorDelegate;
 
   constructor(
     @Inject(PUSH_PROVIDER)
     private readonly pushProvider: PushProvider,
-    @Inject('PRISMA_SERVICE')
-    private readonly prisma: any,
+    @Inject(PRISMA_SERVICE)
+    prisma: any,
   ) {
     super();
+    this.prisma = prisma;
+    this.base = new BaseNotificationProcessorDelegate(this.logger, this.prisma);
   }
 
   async process(job: Job<PushJobData>): Promise<void> {
-    const { notificationId, token, title, body, data, android, apns, webpush } =
-      job.data;
+    const { token, title, body, data, android, apns, webpush } = job.data;
 
-    this.logger.log(
-      `Processing push job ${job.id} for notification ${notificationId}`,
-    );
-
-    try {
+    await this.base.processWithStatusTracking(job, 'push', async () => {
       const sendOptions: PushSendOptions = {
         token,
         title,
@@ -48,35 +50,17 @@ export class PushProcessor extends WorkerHost {
       };
 
       await this.pushProvider.send(sendOptions);
+    });
+  }
+}
 
-      await this.prisma.notification.update({
-        where: { id: notificationId },
-        data: {
-          status: 'sent',
-          sentAt: new Date(),
-        },
-      });
+class BaseNotificationProcessorDelegate extends BaseNotificationProcessor {
+  protected readonly logger: Logger;
+  protected readonly prisma: any;
 
-      this.logger.log(
-        `Push sent successfully for notification ${notificationId}`,
-      );
-    } catch (error) {
-      const failReason =
-        error instanceof Error ? error.message : 'Unknown error';
-
-      this.logger.error(
-        `Failed to send push for notification ${notificationId}: ${failReason}`,
-      );
-
-      await this.prisma.notification.update({
-        where: { id: notificationId },
-        data: {
-          status: 'failed',
-          failReason,
-        },
-      });
-
-      throw error;
-    }
+  constructor(logger: Logger, prisma: any) {
+    super();
+    this.logger = logger;
+    this.prisma = prisma;
   }
 }

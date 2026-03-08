@@ -5,6 +5,7 @@ export { OtpModule } from './otp.module';
 export { OtpService } from './otp.service';
 
 // Providers
+export { BaseCodeOtpProvider } from './providers/base-code-otp.provider';
 export { TotpProvider } from './providers/totp.provider';
 export { SmsOtpProvider } from './providers/sms-otp.provider';
 export { EmailOtpProvider } from './providers/email-otp.provider';
@@ -15,10 +16,10 @@ export { OtpRateLimitGuard } from './guards/otp-rate-limit.guard';
 
 // Decorators
 export { RequireOtp, REQUIRE_OTP_KEY } from './decorators/require-otp.decorator';
+export { CurrentUser } from './decorators/current-user.decorator';
 
 // DTOs
 export {
-  SetupTotpDto,
   ConfirmTotpDto,
   SendOtpDto,
   VerifyOtpDto,

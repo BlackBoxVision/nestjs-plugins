@@ -5,20 +5,9 @@ import { TemplateService } from '../../templates/template.service';
 import {
   AUTH_NOTIFICATION_CONFIG,
   AuthNotificationConfig,
+  UserRegisteredEvent,
+  ForgotPasswordEvent,
 } from './auth-notification.interfaces';
-
-interface UserRegisteredEvent {
-  userId: string;
-  email: string;
-  verificationToken?: string;
-}
-
-interface ForgotPasswordEvent {
-  userId: string;
-  email: string;
-  resetToken: string;
-  expiresInSeconds: number;
-}
 
 @Injectable()
 export class AuthNotificationListener {
@@ -57,7 +46,7 @@ export class AuthNotificationListener {
       const expiresIn = expiresInHours === 1 ? '1 hour' : `${expiresInHours} hours`;
 
       const templateName = this.config.templates?.passwordReset ?? 'password-reset';
-      const html = this.templateService.render(templateName, 'email', {
+      const html = await this.templateService.render(templateName, 'email', {
         resetUrl,
         expiresIn,
       });
@@ -86,7 +75,7 @@ export class AuthNotificationListener {
     const verifyUrl = `${this.config.baseUrl}${verifyPath.replace('{{token}}', event.verificationToken!)}`;
 
     const templateName = this.config.templates?.verifyEmail ?? 'verify-email';
-    const html = this.templateService.render(templateName, 'email', {
+    const html = await this.templateService.render(templateName, 'email', {
       verifyUrl,
     });
 
@@ -106,7 +95,7 @@ export class AuthNotificationListener {
     const appName = this.config.appName ?? 'Our App';
 
     const templateName = this.config.templates?.welcome ?? 'welcome';
-    const html = this.templateService.render(templateName, 'email', {
+    const html = await this.templateService.render(templateName, 'email', {
       name: event.email,
       actionUrl: this.config.baseUrl,
     });

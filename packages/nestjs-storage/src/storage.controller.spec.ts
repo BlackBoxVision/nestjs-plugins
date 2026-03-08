@@ -3,6 +3,7 @@ import { BadRequestException } from '@nestjs/common';
 
 import { StorageController } from './storage.controller';
 import { StorageService } from './storage.service';
+import { STORAGE_MODULE_OPTIONS } from './interfaces';
 
 describe('StorageController', () => {
   let controller: StorageController;
@@ -24,6 +25,10 @@ describe('StorageController', () => {
       controllers: [StorageController],
       providers: [
         { provide: StorageService, useValue: mockStorageService },
+        {
+          provide: STORAGE_MODULE_OPTIONS,
+          useValue: { features: { registerController: true } },
+        },
       ],
     }).compile();
 

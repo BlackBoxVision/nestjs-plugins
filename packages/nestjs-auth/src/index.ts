@@ -4,12 +4,19 @@ export { AuthModule } from './auth.module';
 // Services
 export { AuthService } from './auth.service';
 export { OrganizationService } from './organizations/organization.service';
+export type {
+  Organization,
+  OrganizationBasic,
+  OrganizationMember,
+  OrganizationMemberUser,
+} from './organizations/organization.service';
 
 // Guards
 export { JwtAuthGuard } from './guards/jwt-auth.guard';
 export { RolesGuard } from './guards/roles.guard';
 export { PermissionsGuard } from './guards/permissions.guard';
 export { OrgMemberGuard } from './guards/org-member.guard';
+export { OrganizationsFeatureGuard } from './guards/feature-enabled.guard';
 
 // Decorators
 export { CurrentUser } from './decorators/current-user.decorator';
@@ -30,7 +37,6 @@ export {
   ForgotPasswordDto,
   ResetPasswordDto,
   VerifyEmailDto,
-  ChangePasswordDto,
   TwoFactorVerifyDto,
 } from './dto';
 
@@ -48,6 +54,14 @@ export type {
   PasswordResetEvent,
   EmailVerifiedEvent,
 } from './events';
+
+// Constants
+export {
+  ROLES,
+  VERIFICATION_TOKEN_TYPES,
+  AUTH_PROVIDERS,
+} from './constants';
+export type { Role, VerificationTokenType, AuthProvider } from './constants';
 
 // Interfaces & Constants
 export { AUTH_MODULE_OPTIONS, OTP_SERVICE } from './interfaces';

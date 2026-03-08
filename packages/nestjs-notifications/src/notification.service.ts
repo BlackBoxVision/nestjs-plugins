@@ -1,4 +1,6 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import { PRISMA_SERVICE } from '@bbv/nestjs-prisma';
+import { NOTIFICATION_STATUSES, NOTIFICATION_CHANNELS } from './constants';
 import { InjectQueue } from '@nestjs/bullmq';
 import type { Queue } from 'bullmq';
 import {
@@ -17,7 +19,7 @@ export class NotificationService {
   constructor(
     @Inject(NOTIFICATION_MODULE_OPTIONS)
     private readonly options: NotificationModuleOptions,
-    @Inject('PRISMA_SERVICE')
+    @Inject(PRISMA_SERVICE)
     private readonly prisma: any,
     @Optional()
     @InjectQueue('notifications-email')
@@ -64,7 +66,7 @@ export class NotificationService {
         title,
         body,
         data: data ?? undefined,
-        status: 'pending',
+        status: NOTIFICATION_STATUSES.PENDING,
       },
     });
 
@@ -74,16 +76,16 @@ export class NotificationService {
 
     // Route to the correct channel
     switch (channel) {
-      case 'email':
+      case NOTIFICATION_CHANNELS.EMAIL:
         await this.routeEmail(notification.id, payload);
         break;
-      case 'in_app':
-        await this.routeInApp(payload);
+      case NOTIFICATION_CHANNELS.IN_APP:
+        await this.routeInApp(notification.id, payload);
         break;
-      case 'sms':
+      case NOTIFICATION_CHANNELS.SMS:
         await this.routeSms(notification.id, payload);
         break;
-      case 'push':
+      case NOTIFICATION_CHANNELS.PUSH:
         await this.routePush(notification.id, payload);
         break;
       default:
@@ -122,12 +124,16 @@ export class NotificationService {
       to: payload.to,
       subject: payload.title,
       html: payload.body,
+    }, {
+      removeOnComplete: { count: 1000 },
+      removeOnFail: { count: 5000 },
     });
 
     this.logger.log(`Email notification ${notificationId} queued`);
   }
 
   private async routeInApp(
+    notificationId: string,
     payload: SendNotificationPayload,
   ): Promise<void> {
     const inAppConfig = this.options.channels.inApp;
@@ -142,7 +148,7 @@ export class NotificationService {
       return;
     }
 
-    await this.inAppService.create(payload);
+    await this.inAppService.create(payload, notificationId);
   }
 
   private async routeSms(
@@ -173,6 +179,9 @@ export class NotificationService {
       notificationId,
       to: payload.to,
       body: payload.body,
+    }, {
+      removeOnComplete: { count: 1000 },
+      removeOnFail: { count: 5000 },
     });
 
     this.logger.log(`SMS notification ${notificationId} queued`);
@@ -203,6 +212,9 @@ export class NotificationService {
         title: payload.title,
         body: payload.body,
         data: payload.data as Record<string, string> | undefined,
+      }, {
+        removeOnComplete: { count: 1000 },
+        removeOnFail: { count: 5000 },
       });
 
       this.logger.log(
@@ -234,6 +246,9 @@ export class NotificationService {
           title: payload.title,
           body: payload.body,
           data: payload.data as Record<string, string> | undefined,
+        }, {
+          removeOnComplete: { count: 1000 },
+          removeOnFail: { count: 5000 },
         }),
       ),
     );
@@ -250,7 +265,7 @@ export class NotificationService {
     try {
       await this.prisma.notification.update({
         where: { id: notificationId },
-        data: { status: 'failed', data: { failureReason: reason } },
+        data: { status: NOTIFICATION_STATUSES.FAILED, data: { failureReason: reason } },
       });
     } catch (error) {
       this.logger.error(
