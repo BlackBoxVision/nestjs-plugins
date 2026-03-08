@@ -19,7 +19,17 @@
   "peerDependencies": {
     "@nestjs/common": "^10.0.0",
     "@nestjs/core": "^10.0.0",
-    "@prisma/client": "^5.0.0 || ^6.0.0"
+    "@prisma/client": "^5.0.0 || ^6.0.0",
+    "@nestjs/swagger": "^7.0.0",
+    "@bbv/nestjs-pagination": "^0.0.1"
+  },
+  "peerDependenciesMeta": {
+    "@nestjs/swagger": {
+      "optional": true
+    },
+    "@bbv/nestjs-pagination": {
+      "optional": true
+    }
   },
   "dependencies": {
     "class-validator": "^0.14.0",

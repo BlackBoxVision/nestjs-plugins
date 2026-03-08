@@ -11,14 +11,28 @@ export interface PaginateOptions<TWhereInput> {
   orderBy?: Record<string, 'asc' | 'desc'> | Array<Record<string, 'asc' | 'desc'>>;
   include?: Record<string, unknown>;
   select?: Record<string, unknown>;
+  searchFields?: string[];
+  search?: string;
 }
 
 export async function paginate<T, TWhereInput = Record<string, unknown>>(
   options: PaginateOptions<TWhereInput>,
 ): Promise<PaginatedApiResponse<T>> {
-  const { model, pagination, where, orderBy, include, select } = options;
+  const { model, pagination, where, orderBy, include, select, searchFields, search } = options;
 
   const resolvedOrderBy = orderBy ?? { [pagination.sortBy]: pagination.sortOrder };
+
+  let resolvedWhere = where as Record<string, unknown> | undefined;
+
+  if (search && searchFields && searchFields.length > 0) {
+    const searchConditions = searchFields.map((field) => ({
+      [field]: { contains: search, mode: 'insensitive' },
+    }));
+
+    resolvedWhere = resolvedWhere
+      ? { AND: [resolvedWhere, { OR: searchConditions }] }
+      : ({ OR: searchConditions } as unknown as Record<string, unknown>);
+  }
 
   const findManyArgs: Record<string, unknown> = {
     skip: pagination.skip,
@@ -28,9 +42,9 @@ export async function paginate<T, TWhereInput = Record<string, unknown>>(
 
   const countArgs: Record<string, unknown> = {};
 
-  if (where) {
-    findManyArgs['where'] = where;
-    countArgs['where'] = where;
+  if (resolvedWhere) {
+    findManyArgs['where'] = resolvedWhere;
+    countArgs['where'] = resolvedWhere;
   }
 
   if (include) {

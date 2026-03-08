@@ -30,6 +30,7 @@ const mockJwtService = {
 
 const mockEventEmitter = {
   emit: jest.fn(),
+  emitAsync: jest.fn().mockResolvedValue([]),
 };
 
 const defaultOptions: AuthModuleOptions = {
@@ -80,7 +81,7 @@ describe('AuthService - Event Emission', () => {
 
       await service.register(registerDto);
 
-      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+      expect(mockEventEmitter.emitAsync).toHaveBeenCalledWith(
         AUTH_EVENTS.USER_REGISTERED,
         {
           userId: 'user-1',
@@ -130,7 +131,7 @@ describe('AuthService - Event Emission', () => {
 
       await svc.register(registerDto);
 
-      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+      expect(mockEventEmitter.emitAsync).toHaveBeenCalledWith(
         AUTH_EVENTS.USER_REGISTERED,
         {
           userId: 'user-1',
@@ -153,7 +154,7 @@ describe('AuthService - Event Emission', () => {
 
       await service.forgotPassword('test@example.com');
 
-      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+      expect(mockEventEmitter.emitAsync).toHaveBeenCalledWith(
         AUTH_EVENTS.FORGOT_PASSWORD,
         {
           userId: 'user-1',
@@ -169,7 +170,7 @@ describe('AuthService - Event Emission', () => {
 
       await service.forgotPassword('nonexistent@example.com');
 
-      expect(mockEventEmitter.emit).not.toHaveBeenCalled();
+      expect(mockEventEmitter.emitAsync).not.toHaveBeenCalled();
     });
   });
 
@@ -187,7 +188,7 @@ describe('AuthService - Event Emission', () => {
 
       await service.verifyEmail('valid-token');
 
-      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+      expect(mockEventEmitter.emitAsync).toHaveBeenCalledWith(
         AUTH_EVENTS.EMAIL_VERIFIED,
         { userId: 'user-1' },
       );
@@ -209,7 +210,7 @@ describe('AuthService - Event Emission', () => {
 
       await service.resetPassword('valid-token', 'newPassword123');
 
-      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+      expect(mockEventEmitter.emitAsync).toHaveBeenCalledWith(
         AUTH_EVENTS.PASSWORD_RESET,
         { userId: 'user-1', email: '' },
       );

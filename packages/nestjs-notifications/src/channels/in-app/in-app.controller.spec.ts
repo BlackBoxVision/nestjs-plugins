@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { InAppController } from './in-app.controller';
 import { InAppService } from './in-app.service';
+import { NotificationQueryDto } from '../../dto/notification-query.dto';
 
 describe('InAppController', () => {
   let controller: InAppController;
@@ -31,6 +32,12 @@ describe('InAppController', () => {
     expect(controller).toBeDefined();
   });
 
+  function createQuery(overrides: Partial<NotificationQueryDto> = {}): NotificationQueryDto {
+    const query = new NotificationQueryDto();
+    Object.assign(query, overrides);
+    return query;
+  }
+
   describe('findAll', () => {
     const mockResult = {
       data: [{ id: 'notif-1', title: 'Test' }],
@@ -41,82 +48,40 @@ describe('InAppController', () => {
 
     it('should extract userId from req.user.id and call findAllForUser', async () => {
       mockInAppService.findAllForUser.mockResolvedValue(mockResult);
-      const req = { user: { id: 'user-1' } };
+      const req = { user: { id: 'user-1' } } as any;
 
-      const result = await controller.findAll(req);
+      const result = await controller.findAll(req, createQuery());
 
       expect(result).toEqual(mockResult);
       expect(mockInAppService.findAllForUser).toHaveBeenCalledWith('user-1', {
-        skip: undefined,
-        take: undefined,
-        status: undefined,
-      });
-    });
-
-    it('should extract userId from req.user.sub when id is not present', async () => {
-      mockInAppService.findAllForUser.mockResolvedValue(mockResult);
-      const req = { user: { sub: 'user-sub-1' } };
-
-      const result = await controller.findAll(req);
-
-      expect(result).toEqual(mockResult);
-      expect(mockInAppService.findAllForUser).toHaveBeenCalledWith(
-        'user-sub-1',
-        {
-          skip: undefined,
-          take: undefined,
-          status: undefined,
-        },
-      );
-    });
-
-    it('should prefer req.user.id over req.user.sub', async () => {
-      mockInAppService.findAllForUser.mockResolvedValue(mockResult);
-      const req = { user: { id: 'user-id', sub: 'user-sub' } };
-
-      await controller.findAll(req);
-
-      expect(mockInAppService.findAllForUser).toHaveBeenCalledWith(
-        'user-id',
-        expect.any(Object),
-      );
-    });
-
-    it('should parse skip and take as integers', async () => {
-      mockInAppService.findAllForUser.mockResolvedValue(mockResult);
-      const req = { user: { id: 'user-1' } };
-
-      await controller.findAll(req, '10', '25');
-
-      expect(mockInAppService.findAllForUser).toHaveBeenCalledWith('user-1', {
-        skip: 10,
-        take: 25,
+        skip: 0,
+        take: 10,
         status: undefined,
       });
     });
 
     it('should pass status filter when provided', async () => {
       mockInAppService.findAllForUser.mockResolvedValue(mockResult);
-      const req = { user: { id: 'user-1' } };
+      const req = { user: { id: 'user-1' } } as any;
 
-      await controller.findAll(req, '0', '20', 'read');
+      await controller.findAll(req, createQuery({ status: 'read' }));
 
       expect(mockInAppService.findAllForUser).toHaveBeenCalledWith('user-1', {
         skip: 0,
-        take: 20,
+        take: 10,
         status: 'read',
       });
     });
 
-    it('should leave skip and take undefined when not provided', async () => {
+    it('should pass pagination params from query', async () => {
       mockInAppService.findAllForUser.mockResolvedValue(mockResult);
-      const req = { user: { id: 'user-1' } };
+      const req = { user: { id: 'user-1' } } as any;
 
-      await controller.findAll(req, undefined, undefined, undefined);
+      await controller.findAll(req, createQuery({ page: 2, limit: 25 }));
 
       expect(mockInAppService.findAllForUser).toHaveBeenCalledWith('user-1', {
-        skip: undefined,
-        take: undefined,
+        skip: 50,
+        take: 25,
         status: undefined,
       });
     });
@@ -125,7 +90,7 @@ describe('InAppController', () => {
   describe('markAsRead', () => {
     it('should extract userId from req.user.id and call markAsRead', async () => {
       mockInAppService.markAsRead.mockResolvedValue(undefined);
-      const req = { user: { id: 'user-1' } };
+      const req = { user: { id: 'user-1' } } as any;
 
       const result = await controller.markAsRead(req, 'notif-42');
 
@@ -135,49 +100,24 @@ describe('InAppController', () => {
         'user-1',
       );
     });
-
-    it('should extract userId from req.user.sub', async () => {
-      mockInAppService.markAsRead.mockResolvedValue(undefined);
-      const req = { user: { sub: 'user-sub-1' } };
-
-      const result = await controller.markAsRead(req, 'notif-99');
-
-      expect(result).toEqual({ success: true });
-      expect(mockInAppService.markAsRead).toHaveBeenCalledWith(
-        'notif-99',
-        'user-sub-1',
-      );
-    });
   });
 
   describe('markAllAsRead', () => {
     it('should extract userId from req.user.id and call markAllAsRead', async () => {
       mockInAppService.markAllAsRead.mockResolvedValue(undefined);
-      const req = { user: { id: 'user-1' } };
+      const req = { user: { id: 'user-1' } } as any;
 
       const result = await controller.markAllAsRead(req);
 
       expect(result).toEqual({ success: true });
       expect(mockInAppService.markAllAsRead).toHaveBeenCalledWith('user-1');
     });
-
-    it('should extract userId from req.user.sub', async () => {
-      mockInAppService.markAllAsRead.mockResolvedValue(undefined);
-      const req = { user: { sub: 'user-sub-1' } };
-
-      const result = await controller.markAllAsRead(req);
-
-      expect(result).toEqual({ success: true });
-      expect(mockInAppService.markAllAsRead).toHaveBeenCalledWith(
-        'user-sub-1',
-      );
-    });
   });
 
   describe('getUnreadCount', () => {
     it('should extract userId from req.user.id and return count', async () => {
       mockInAppService.getUnreadCount.mockResolvedValue(5);
-      const req = { user: { id: 'user-1' } };
+      const req = { user: { id: 'user-1' } } as any;
 
       const result = await controller.getUnreadCount(req);
 
@@ -185,21 +125,9 @@ describe('InAppController', () => {
       expect(mockInAppService.getUnreadCount).toHaveBeenCalledWith('user-1');
     });
 
-    it('should extract userId from req.user.sub', async () => {
-      mockInAppService.getUnreadCount.mockResolvedValue(0);
-      const req = { user: { sub: 'user-sub-1' } };
-
-      const result = await controller.getUnreadCount(req);
-
-      expect(result).toEqual({ count: 0 });
-      expect(mockInAppService.getUnreadCount).toHaveBeenCalledWith(
-        'user-sub-1',
-      );
-    });
-
     it('should return zero count when no unread notifications', async () => {
       mockInAppService.getUnreadCount.mockResolvedValue(0);
-      const req = { user: { id: 'user-1' } };
+      const req = { user: { id: 'user-1' } } as any;
 
       const result = await controller.getUnreadCount(req);
 

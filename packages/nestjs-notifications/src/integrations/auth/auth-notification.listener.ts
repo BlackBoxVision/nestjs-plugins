@@ -33,36 +33,52 @@ export class AuthNotificationListener {
 
   @OnEvent('auth.user.registered')
   async handleUserRegistered(event: UserRegisteredEvent): Promise<void> {
-    if (event.verificationToken) {
-      await this.sendVerifyEmail(event);
-    } else {
-      await this.sendWelcomeEmail(event);
+    try {
+      if (event.verificationToken) {
+        await this.sendVerifyEmail(event);
+      } else {
+        await this.sendWelcomeEmail(event);
+      }
+    } catch (error) {
+      this.logger.error(
+        `Failed to handle user registered event for ${event.email}: ${error instanceof Error ? error.message : String(error)}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw error;
     }
   }
 
   @OnEvent('auth.password.forgot')
   async handleForgotPassword(event: ForgotPasswordEvent): Promise<void> {
-    const resetPath = this.config.resetPasswordPath ?? '/auth/reset-password?token={{token}}';
-    const resetUrl = `${this.config.baseUrl}${resetPath.replace('{{token}}', event.resetToken)}`;
-    const expiresInHours = Math.round(event.expiresInSeconds / 3600);
-    const expiresIn = expiresInHours === 1 ? '1 hour' : `${expiresInHours} hours`;
+    try {
+      const resetPath = this.config.resetPasswordPath ?? '/auth/reset-password?token={{token}}';
+      const resetUrl = `${this.config.baseUrl}${resetPath.replace('{{token}}', event.resetToken)}`;
+      const expiresInHours = Math.round(event.expiresInSeconds / 3600);
+      const expiresIn = expiresInHours === 1 ? '1 hour' : `${expiresInHours} hours`;
 
-    const templateName = this.config.templates?.passwordReset ?? 'password-reset';
-    const html = this.templateService.render(templateName, 'email', {
-      resetUrl,
-      expiresIn,
-    });
+      const templateName = this.config.templates?.passwordReset ?? 'password-reset';
+      const html = this.templateService.render(templateName, 'email', {
+        resetUrl,
+        expiresIn,
+      });
 
-    await this.notificationService.send({
-      userId: event.userId,
-      channel: 'email',
-      type: 'auth.password-reset',
-      title: 'Reset Your Password',
-      body: html,
-      to: event.email,
-    });
+      await this.notificationService.send({
+        userId: event.userId,
+        channel: 'email',
+        type: 'auth.password-reset',
+        title: 'Reset Your Password',
+        body: html,
+        to: event.email,
+      });
 
-    this.logger.log(`Password reset email sent to ${event.email}`);
+      this.logger.log(`Password reset email sent to ${event.email}`);
+    } catch (error) {
+      this.logger.error(
+        `Failed to send password reset email to ${event.email}: ${error instanceof Error ? error.message : String(error)}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw error;
+    }
   }
 
   private async sendVerifyEmail(event: UserRegisteredEvent): Promise<void> {

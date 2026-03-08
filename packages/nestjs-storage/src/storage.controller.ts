@@ -11,10 +11,20 @@ import {
   Logger,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiParam,
+  ApiConsumes,
+} from '@nestjs/swagger';
 
 import { StorageService } from './storage.service';
 import { UploadResult, GetUrlOptions } from './interfaces';
 
+@ApiTags('Storage')
+@ApiBearerAuth()
 @Controller('storage')
 export class StorageController {
   private readonly logger = new Logger(StorageController.name);
@@ -23,6 +33,11 @@ export class StorageController {
 
   @Post('upload')
   @UseInterceptors(FileInterceptor('file'))
+  @ApiOperation({ summary: 'Upload a file', description: 'Upload a single file to the configured storage provider' })
+  @ApiConsumes('multipart/form-data')
+  @ApiResponse({ status: 201, description: 'File uploaded successfully' })
+  @ApiResponse({ status: 400, description: 'No file provided' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   async upload(
     @UploadedFile() file: Express.Multer.File,
   ): Promise<UploadResult> {
@@ -38,6 +53,11 @@ export class StorageController {
   }
 
   @Delete(':key')
+  @ApiOperation({ summary: 'Delete a file', description: 'Delete a file from storage by its key' })
+  @ApiParam({ name: 'key', description: 'Storage key of the file to delete' })
+  @ApiResponse({ status: 200, description: 'File deleted successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'File not found' })
   async delete(@Param('key') key: string): Promise<{ deleted: boolean }> {
     this.logger.log(`Received delete request for key "${key}"`);
 
@@ -47,6 +67,11 @@ export class StorageController {
   }
 
   @Get(':key/url')
+  @ApiOperation({ summary: 'Get a signed URL', description: 'Generate a signed URL for accessing a file by its key' })
+  @ApiParam({ name: 'key', description: 'Storage key of the file' })
+  @ApiResponse({ status: 200, description: 'Signed URL generated successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid expiresIn parameter' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   async getUrl(
     @Param('key') key: string,
     @Query('expiresIn') expiresIn?: string,

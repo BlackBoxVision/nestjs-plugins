@@ -3,11 +3,12 @@ import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { PrismaModule } from '@bbv/nestjs-prisma';
-import { AuthModule, JwtAuthGuard } from '@bbv/nestjs-auth';
+import { AuthModule, JwtAuthGuard, PermissionsGuard } from '@bbv/nestjs-auth';
 import { OtpModule } from '@bbv/nestjs-otp';
 import { StorageModule } from '@bbv/nestjs-storage';
 import { NotificationModule, AuthNotificationModule } from '@bbv/nestjs-notifications';
 import { AuditLogModule } from '@bbv/nestjs-audit-log';
+import { LoggerModule } from '@bbv/nestjs-logger';
 import { AppController } from './app.controller';
 import { ItemsModule } from './items/items.module';
 import * as path from 'path';
@@ -17,6 +18,10 @@ import * as path from 'path';
     ConfigModule.forRoot({ isGlobal: true }),
 
     EventEmitterModule.forRoot(),
+
+    LoggerModule.forRoot({
+      prettyPrint: process.env.NODE_ENV !== 'production',
+    }),
 
     PrismaModule.forRoot({ isGlobal: true }),
 
@@ -53,6 +58,16 @@ import * as path from 'path';
               }
             : {}),
         },
+        permissions: {
+          rolePermissions: {
+            admin: ['*'],
+            owner: ['org:*', 'items:*', 'audit:*', 'notifications:*', 'storage:*'],
+            member: ['items:read', 'items:create', 'notifications:read', 'notifications:manage'],
+            user: ['items:read', 'items:create', 'notifications:read'],
+          },
+          superAdminRoles: ['admin'],
+        },
+        defaultAdminEmail: config.get('ADMIN_EMAIL'),
       }),
       inject: [ConfigService],
     }),
@@ -125,7 +140,14 @@ import * as path from 'path';
             },
           },
           inApp: { enabled: true },
-          sms: { enabled: false },
+          sms: {
+            enabled: true,
+            provider: 'log' as const,
+          },
+          push: {
+            enabled: true,
+            provider: 'log' as const,
+          },
         },
         features: {
           preferences: true,
@@ -169,6 +191,10 @@ import * as path from 'path';
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: PermissionsGuard,
     },
   ],
   controllers: [AppController],

@@ -31,60 +31,23 @@ describe('PreferenceController', () => {
 
   describe('getPreferences', () => {
     const mockPreferences = [
-      {
-        id: 'pref-1',
-        userId: 'user-1',
-        channel: 'email',
-        type: 'marketing',
-        enabled: false,
-      },
-      {
-        id: 'pref-2',
-        userId: 'user-1',
-        channel: 'sms',
-        type: 'alerts',
-        enabled: true,
-      },
+      { id: 'pref-1', userId: 'user-1', channel: 'email', type: 'marketing', enabled: false },
+      { id: 'pref-2', userId: 'user-1', channel: 'sms', type: 'alerts', enabled: true },
     ];
 
     it('should extract userId from req.user.id and return preferences', async () => {
       mockPreferenceService.getPreferences.mockResolvedValue(mockPreferences);
-      const req = { user: { id: 'user-1' } };
+      const req = { user: { id: 'user-1' } } as any;
 
       const result = await controller.getPreferences(req);
 
       expect(result).toEqual(mockPreferences);
-      expect(mockPreferenceService.getPreferences).toHaveBeenCalledWith(
-        'user-1',
-      );
-    });
-
-    it('should extract userId from req.user.sub', async () => {
-      mockPreferenceService.getPreferences.mockResolvedValue(mockPreferences);
-      const req = { user: { sub: 'user-sub-1' } };
-
-      const result = await controller.getPreferences(req);
-
-      expect(result).toEqual(mockPreferences);
-      expect(mockPreferenceService.getPreferences).toHaveBeenCalledWith(
-        'user-sub-1',
-      );
-    });
-
-    it('should prefer req.user.id over req.user.sub', async () => {
-      mockPreferenceService.getPreferences.mockResolvedValue([]);
-      const req = { user: { id: 'user-id', sub: 'user-sub' } };
-
-      await controller.getPreferences(req);
-
-      expect(mockPreferenceService.getPreferences).toHaveBeenCalledWith(
-        'user-id',
-      );
+      expect(mockPreferenceService.getPreferences).toHaveBeenCalledWith('user-1');
     });
 
     it('should return empty array when user has no preferences', async () => {
       mockPreferenceService.getPreferences.mockResolvedValue([]);
-      const req = { user: { id: 'user-1' } };
+      const req = { user: { id: 'user-1' } } as any;
 
       const result = await controller.getPreferences(req);
 
@@ -102,10 +65,8 @@ describe('PreferenceController', () => {
     };
 
     it('should extract userId from req.user.id and upsert preference', async () => {
-      mockPreferenceService.upsertPreference.mockResolvedValue(
-        mockUpsertResult,
-      );
-      const req = { user: { id: 'user-1' } };
+      mockPreferenceService.upsertPreference.mockResolvedValue(mockUpsertResult);
+      const req = { user: { id: 'user-1' } } as any;
       const body = { channel: 'email', type: 'marketing', enabled: false };
 
       const result = await controller.upsertPreference(req, body);
@@ -119,28 +80,10 @@ describe('PreferenceController', () => {
       );
     });
 
-    it('should extract userId from req.user.sub', async () => {
-      mockPreferenceService.upsertPreference.mockResolvedValue(
-        mockUpsertResult,
-      );
-      const req = { user: { sub: 'user-sub-1' } };
-      const body = { channel: 'sms', type: 'alerts', enabled: true };
-
-      const result = await controller.upsertPreference(req, body);
-
-      expect(result).toEqual(mockUpsertResult);
-      expect(mockPreferenceService.upsertPreference).toHaveBeenCalledWith(
-        'user-sub-1',
-        'sms',
-        'alerts',
-        true,
-      );
-    });
-
     it('should handle enabling a preference', async () => {
       const enabledResult = { ...mockUpsertResult, enabled: true };
       mockPreferenceService.upsertPreference.mockResolvedValue(enabledResult);
-      const req = { user: { id: 'user-1' } };
+      const req = { user: { id: 'user-1' } } as any;
       const body = { channel: 'push', type: 'promotions', enabled: true };
 
       const result = await controller.upsertPreference(req, body);
@@ -151,24 +94,6 @@ describe('PreferenceController', () => {
         'push',
         'promotions',
         true,
-      );
-    });
-
-    it('should handle disabling a preference', async () => {
-      mockPreferenceService.upsertPreference.mockResolvedValue(
-        mockUpsertResult,
-      );
-      const req = { user: { id: 'user-1' } };
-      const body = { channel: 'in_app', type: 'updates', enabled: false };
-
-      const result = await controller.upsertPreference(req, body);
-
-      expect(result).toEqual(mockUpsertResult);
-      expect(mockPreferenceService.upsertPreference).toHaveBeenCalledWith(
-        'user-1',
-        'in_app',
-        'updates',
-        false,
       );
     });
   });

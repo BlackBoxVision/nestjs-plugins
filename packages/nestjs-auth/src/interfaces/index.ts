@@ -51,6 +51,15 @@ export interface TwoFactorJwtConfig {
   challengeTokenExpiresIn?: string;
 }
 
+export interface PermissionMapping {
+  [role: string]: string[];
+}
+
+export interface PermissionsConfig {
+  rolePermissions: PermissionMapping;
+  superAdminRoles?: string[];
+}
+
 export interface AuthModuleOptions {
   jwt: JwtConfig;
   features?: AuthFeatures;
@@ -62,6 +71,8 @@ export interface AuthModuleOptions {
   passwordHashRounds?: number;
   verificationTokenExpiresIn?: number;
   twoFactorJwt?: TwoFactorJwtConfig;
+  permissions?: PermissionsConfig;
+  defaultAdminEmail?: string;
 }
 
 export interface AuthModuleAsyncOptions {
@@ -73,6 +84,7 @@ export interface AuthModuleAsyncOptions {
 export interface JwtPayload {
   sub: string;
   email: string;
+  role?: string;
   iat?: number;
   exp?: number;
 }
@@ -97,6 +109,7 @@ export interface TwoFactorChallengeResult {
 export interface AuthenticatedUser {
   id: string;
   email: string;
+  role?: string;
   emailVerified: boolean;
   isActive: boolean;
 }

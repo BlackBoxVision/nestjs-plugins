@@ -92,6 +92,11 @@ export type SmsChannelConfig =
       provider: 'twilio';
       providerOptions: TwilioProviderOptions;
     }
+  | {
+      enabled: true;
+      provider: 'log';
+      providerOptions?: Record<string, never>;
+    }
   | { enabled: false };
 
 export interface PushProvider {
@@ -117,6 +122,11 @@ export type PushChannelConfig =
       enabled: true;
       provider: 'firebase';
       providerOptions: FirebaseProviderOptions;
+    }
+  | {
+      enabled: true;
+      provider: 'log';
+      providerOptions?: Record<string, never>;
     }
   | { enabled: false };
 

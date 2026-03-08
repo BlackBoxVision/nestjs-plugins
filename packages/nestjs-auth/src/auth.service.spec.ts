@@ -91,6 +91,7 @@ describe('AuthService', () => {
         data: {
           email: 'test@example.com',
           passwordHash: 'hashed-password',
+          role: 'user',
           accounts: {
             create: { provider: 'credentials' },
           },

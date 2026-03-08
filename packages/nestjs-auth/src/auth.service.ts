@@ -66,10 +66,17 @@ export class AuthService {
     const rounds = this.options.passwordHashRounds ?? 10;
     const passwordHash = await bcrypt.hash(dto.password, rounds);
 
+    const role =
+      this.options.defaultAdminEmail &&
+      dto.email === this.options.defaultAdminEmail
+        ? 'admin'
+        : 'user';
+
     const user = await this.prisma.user.create({
       data: {
         email: dto.email,
         passwordHash,
+        role,
         accounts: {
           create: {
             provider: 'credentials',
@@ -94,7 +101,7 @@ export class AuthService {
       });
     }
 
-    this.emitEvent(AUTH_EVENTS.USER_REGISTERED, {
+    await this.emitEvent(AUTH_EVENTS.USER_REGISTERED, {
       userId: user.id,
       email: user.email,
       verificationToken,
@@ -106,6 +113,7 @@ export class AuthService {
       user: {
         id: user.id,
         email: user.email,
+        role: user.role,
         emailVerified: user.emailVerified,
         isActive: user.isActive,
       },
@@ -222,15 +230,17 @@ export class AuthService {
     return {
       id: user.id,
       email: user.email,
+      role: user.role,
       emailVerified: user.emailVerified,
       isActive: user.isActive,
     };
   }
 
-  generateToken(user: { id: string; email: string }): string {
+  generateToken(user: { id: string; email: string; role?: string }): string {
     const payload: JwtPayload = {
       sub: user.id,
       email: user.email,
+      role: user.role,
     };
 
     return this.jwtService.sign(payload);
@@ -272,7 +282,7 @@ export class AuthService {
       }),
     ]);
 
-    this.emitEvent(AUTH_EVENTS.EMAIL_VERIFIED, {
+    await this.emitEvent(AUTH_EVENTS.EMAIL_VERIFIED, {
       userId: verificationToken.userId,
     });
 
@@ -305,7 +315,7 @@ export class AuthService {
       },
     });
 
-    this.emitEvent(AUTH_EVENTS.FORGOT_PASSWORD, {
+    await this.emitEvent(AUTH_EVENTS.FORGOT_PASSWORD, {
       userId: user.id,
       email: user.email,
       resetToken: token,
@@ -357,7 +367,7 @@ export class AuthService {
       }),
     ]);
 
-    this.emitEvent(AUTH_EVENTS.PASSWORD_RESET, {
+    await this.emitEvent(AUTH_EVENTS.PASSWORD_RESET, {
       userId: verificationToken.userId,
       email: '',
     });
@@ -407,6 +417,7 @@ export class AuthService {
         user: {
           id: account.user.id,
           email: account.user.email,
+          role: account.user.role,
           emailVerified: account.user.emailVerified,
           isActive: account.user.isActive,
         },
@@ -469,6 +480,7 @@ export class AuthService {
       user: {
         id: user.id,
         email: user.email,
+        role: user.role,
         emailVerified: user.emailVerified,
         isActive: user.isActive,
       },
@@ -558,6 +570,7 @@ export class AuthService {
     return {
       id: user.id,
       email: user.email,
+      role: user.role,
       emailVerified: user.emailVerified,
       isActive: user.isActive,
     };
@@ -592,9 +605,19 @@ export class AuthService {
     return this.options.features?.[feature] !== false;
   }
 
-  private emitEvent(event: string, payload: Record<string, unknown>): void {
+  private async emitEvent(
+    event: string,
+    payload: Record<string, unknown>,
+  ): Promise<void> {
     if (this.eventEmitter) {
-      this.eventEmitter.emit(event, payload);
+      try {
+        await this.eventEmitter.emitAsync(event, payload);
+      } catch (error) {
+        this.logger.error(
+          `Failed to emit event ${event}: ${error instanceof Error ? error.message : String(error)}`,
+          error instanceof Error ? error.stack : undefined,
+        );
+      }
     }
   }
 }

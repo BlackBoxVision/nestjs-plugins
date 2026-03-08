@@ -30,6 +30,8 @@ import { SmtpEmailProvider } from './channels/email/providers/smtp.provider';
 import { SendGridEmailProvider } from './channels/email/providers/sendgrid.provider';
 import { TwilioSmsProvider } from './channels/sms/providers/twilio.provider';
 import { FirebasePushProvider } from './channels/push/providers/firebase.provider';
+import { LogSmsProvider } from './channels/sms/providers/log.provider';
+import { LogPushProvider } from './channels/push/providers/log.provider';
 import { WorkerCleanupService } from './worker-cleanup.service';
 
 @Module({})
@@ -407,6 +409,8 @@ export class NotificationModule {
     switch (config.provider) {
       case 'twilio':
         return new TwilioSmsProvider(config.providerOptions);
+      case 'log':
+        return new LogSmsProvider();
       default:
         throw new Error(`Unknown SMS provider: ${(config as any).provider}`);
     }
@@ -427,6 +431,8 @@ export class NotificationModule {
     switch (config.provider) {
       case 'firebase':
         return new FirebasePushProvider(config.providerOptions);
+      case 'log':
+        return new LogPushProvider();
       default:
         throw new Error(`Unknown push provider: ${(config as any).provider}`);
     }

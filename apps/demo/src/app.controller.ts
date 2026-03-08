@@ -1,5 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Public } from '@bbv/nestjs-auth';
 
 @ApiTags('Health')
@@ -7,6 +7,7 @@ import { Public } from '@bbv/nestjs-auth';
 export class AppController {
   @Public()
   @Get('health')
+  @ApiOperation({ summary: 'Health check' })
   health() {
     return {
       status: 'ok',

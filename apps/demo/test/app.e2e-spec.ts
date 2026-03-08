@@ -1,13 +1,91 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
+import * as http from 'http';
 import * as OTPAuth from 'otpauth';
 import { AppModule } from '../src/app.module';
 import { TransformInterceptor, HttpExceptionFilter } from '@bbv/nestjs-response';
+import { NotificationService } from '@bbv/nestjs-notifications';
+
+// ─── SMTP4Dev Helpers ─────────────────────────────────────
+
+const SMTP4DEV_API = 'http://localhost:8027';
+
+function smtp4devRequest(method: string, path: string): Promise<{ status: number; body: any }> {
+  return new Promise((resolve, reject) => {
+    const url = new URL(path, SMTP4DEV_API);
+    const req = http.request(url, { method }, (res) => {
+      let data = '';
+      res.on('data', (chunk: Buffer) => { data += chunk.toString(); });
+      res.on('end', () => {
+        let body: any;
+        try { body = JSON.parse(data); } catch { body = data; }
+        resolve({ status: res.statusCode ?? 0, body });
+      });
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+async function clearEmails(): Promise<void> {
+  await smtp4devRequest('DELETE', '/api/Messages/*');
+}
+
+async function waitForEmail(
+  recipient: string,
+  timeoutMs = 10_000,
+): Promise<{ id: string; from: string; to: string; subject: string }> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    const { body } = await smtp4devRequest('GET', '/api/Messages');
+    const messages = Array.isArray(body) ? body : body?.results ?? [];
+    const match = messages.find((m: any) => {
+      const toField = m.deliveredTo ?? (Array.isArray(m.to) ? m.to.join(', ') : m.to ?? '');
+      return toField.toLowerCase().includes(recipient.toLowerCase());
+    });
+    if (match) {
+      const to = match.deliveredTo ?? (Array.isArray(match.to) ? match.to.join(', ') : match.to);
+      return { id: match.id, from: match.from, to, subject: match.subject };
+    }
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  throw new Error(`No email found for ${recipient} within ${timeoutMs}ms`);
+}
+
+async function getEmailHtml(messageId: string): Promise<string> {
+  const { body } = await smtp4devRequest('GET', `/api/Messages/${messageId}/html`);
+  return typeof body === 'string' ? body : JSON.stringify(body);
+}
+
+// ─── Notification Status Polling Helper ───────────────────
+
+async function waitForNotificationStatus(
+  prisma: any,
+  notificationId: string,
+  status: string,
+  timeoutMs = 10_000,
+): Promise<any> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    const notification = await prisma.notification.findUnique({
+      where: { id: notificationId },
+    });
+    if (notification?.status === status) {
+      return notification;
+    }
+    await new Promise((r) => setTimeout(r, 300));
+  }
+  throw new Error(
+    `Notification ${notificationId} did not reach status "${status}" within ${timeoutMs}ms`,
+  );
+}
 
 describe('Demo App (e2e)', () => {
   let app: INestApplication;
   let httpServer: any;
+  let notificationService: NotificationService;
+  let prisma: any;
 
   // Shared state across tests
   let accessToken: string;
@@ -42,6 +120,8 @@ describe('Demo App (e2e)', () => {
 
     await app.init();
     httpServer = app.getHttpServer();
+    notificationService = app.get(NotificationService);
+    prisma = app.get('PRISMA_SERVICE');
   });
 
   afterAll(async () => {
@@ -1028,6 +1108,184 @@ describe('Demo App (e2e)', () => {
         .expect(200);
 
       expect(res.body.data.email).not.toBe(testEmail);
+    });
+  });
+
+  // ─── Email Delivery (SMTP4Dev) ────────────────────────────
+
+  describe('Email Delivery (SMTP4Dev)', () => {
+    const emailTestUser = `email-test-${Date.now()}@test.local`;
+
+    beforeAll(async () => {
+      try {
+        await clearEmails();
+      } catch {
+        // SMTP4Dev may not be running — tests will fail gracefully
+      }
+    });
+
+    it('should deliver verification email on registration', async () => {
+      const res = await request(httpServer)
+        .post('/auth/register')
+        .send({ email: emailTestUser, password: testPassword })
+        .expect(201);
+
+      expect(res.body.success).toBe(true);
+
+      const email = await waitForEmail(emailTestUser);
+      expect(email.subject).toContain('Verify');
+      expect(email.to.toLowerCase()).toContain(emailTestUser);
+
+      const html = await getEmailHtml(email.id);
+      expect(html).toContain('verify');
+    });
+
+    it('should deliver password-reset email on forgot-password', async () => {
+      await clearEmails();
+
+      await request(httpServer)
+        .post('/auth/forgot-password')
+        .send({ email: emailTestUser })
+        .expect(201);
+
+      const email = await waitForEmail(emailTestUser);
+      expect(email.subject).toContain('Reset');
+      expect(email.to.toLowerCase()).toContain(emailTestUser);
+
+      const html = await getEmailHtml(email.id);
+      expect(html).toContain('reset');
+    });
+
+    it('should send email from configured sender address', async () => {
+      // Use the email captured in the previous test or trigger a new one
+      await clearEmails();
+
+      await request(httpServer)
+        .post('/auth/forgot-password')
+        .send({ email: emailTestUser })
+        .expect(201);
+
+      const email = await waitForEmail(emailTestUser);
+      expect(email.from.toLowerCase()).toContain('noreply@demo.local');
+    });
+  });
+
+  // ─── SMS Delivery (Log Provider) ──────────────────────────
+
+  describe('SMS Delivery (Log Provider)', () => {
+    it('should process SMS notification through BullMQ pipeline', async () => {
+      const { id } = await notificationService.send({
+        userId,
+        channel: 'sms',
+        type: 'test.sms',
+        title: 'Test SMS',
+        body: 'Hello via SMS',
+        to: '+15551234567',
+      });
+
+      expect(id).toBeDefined();
+      expect(id).not.toBe('');
+
+      const notification = await waitForNotificationStatus(prisma, id, 'sent');
+      expect(notification.sentAt).toBeDefined();
+      expect(notification.channel).toBe('sms');
+    });
+  });
+
+  // ─── Push Delivery (Log Provider) ─────────────────────────
+
+  describe('Push Delivery (Log Provider)', () => {
+    const deviceToken = `test-device-token-${Date.now()}`;
+    const deviceToken2 = `test-device-token2-${Date.now()}`;
+
+    it('should register a device token', async () => {
+      const res = await request(httpServer)
+        .post('/notifications/devices')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ token: deviceToken, platform: 'ios' })
+        .expect(201);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.token).toBe(deviceToken);
+    });
+
+    it('should list registered device tokens', async () => {
+      const res = await request(httpServer)
+        .get('/notifications/devices')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      const devices = res.body.data;
+      expect(Array.isArray(devices)).toBe(true);
+      expect(devices.some((d: any) => d.token === deviceToken)).toBe(true);
+    });
+
+    it('should process push notification through BullMQ pipeline', async () => {
+      const { id } = await notificationService.send({
+        userId,
+        channel: 'push',
+        type: 'test.push',
+        title: 'Test Push',
+        body: 'Hello via Push',
+        to: deviceToken,
+      });
+
+      expect(id).toBeDefined();
+      expect(id).not.toBe('');
+
+      const notification = await waitForNotificationStatus(prisma, id, 'sent');
+      expect(notification.sentAt).toBeDefined();
+      expect(notification.channel).toBe('push');
+    });
+
+    it('should fan out push to all registered devices', async () => {
+      // Register a second device
+      await request(httpServer)
+        .post('/notifications/devices')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ token: deviceToken2, platform: 'android' })
+        .expect(201);
+
+      const { id } = await notificationService.send({
+        userId,
+        channel: 'push',
+        type: 'test.push-fanout',
+        title: 'Fanout Push',
+        body: 'Hello to all devices',
+      });
+
+      expect(id).toBeDefined();
+      expect(id).not.toBe('');
+
+      const notification = await waitForNotificationStatus(prisma, id, 'sent');
+      expect(notification.sentAt).toBeDefined();
+    });
+
+    it('should unregister a device token', async () => {
+      const res = await request(httpServer)
+        .delete(`/notifications/devices/${deviceToken}`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+    });
+
+    it('should unregister all device tokens', async () => {
+      const res = await request(httpServer)
+        .delete('/notifications/devices')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+
+      // Verify empty
+      const listRes = await request(httpServer)
+        .get('/notifications/devices')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(200);
+
+      expect(listRes.body.data).toEqual([]);
     });
   });
 });

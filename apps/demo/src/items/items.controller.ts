@@ -3,6 +3,7 @@ import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { PaginationDto, ApiPaginatedResponse } from '@bbv/nestjs-pagination';
 import { CurrentUser, Public } from '@bbv/nestjs-auth';
 import { ItemsService } from './items.service';
+import { CreateItemDto } from './dto/create-item.dto';
 
 @ApiTags('Items')
 @ApiBearerAuth()
@@ -24,7 +25,7 @@ export class ItemsController {
 
   @Post()
   create(
-    @Body() body: { name: string; description?: string },
+    @Body() body: CreateItemDto,
     @CurrentUser('id') userId: string,
   ) {
     return this.itemsService.create({ ...body, createdBy: userId });

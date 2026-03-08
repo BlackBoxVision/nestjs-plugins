@@ -23,7 +23,9 @@
     "@prisma/client": "^5.0.0 || ^6.0.0",
     "bullmq": "^5.0.0",
     "@nestjs/event-emitter": "^2.0.0 || ^3.0.0",
-    "firebase-admin": "^12.0.0 || ^13.0.0"
+    "firebase-admin": "^12.0.0 || ^13.0.0",
+    "@nestjs/swagger": "^7.0.0",
+    "@bbv/nestjs-pagination": "^0.0.1"
   },
   "peerDependenciesMeta": {
     "@nestjs/event-emitter": {
@@ -31,11 +33,19 @@
     },
     "firebase-admin": {
       "optional": true
+    },
+    "@nestjs/swagger": {
+      "optional": true
+    },
+    "@bbv/nestjs-pagination": {
+      "optional": true
     }
   },
   "dependencies": {
     "nodemailer": "^6.9.0",
-    "handlebars": "^4.7.0"
+    "handlebars": "^4.7.0",
+    "class-validator": "^0.14.0",
+    "class-transformer": "^0.5.1"
   },
   "devDependencies": {
     "@nestjs/common": "^10.0.0",

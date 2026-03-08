@@ -1,0 +1,29 @@
+{
+  "name": "@bbv/nestjs-logger",
+  "version": "0.0.1",
+  "description": "Structured logging module for NestJS using Pino",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc",
+    "test": "jest --passWithNoTests",
+    "test:cov": "jest --coverage --passWithNoTests",
+    "lint": "eslint src --ext .ts",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist coverage"
+  },
+  "peerDependencies": {
+    "@nestjs/common": "^10.0.0",
+    "@nestjs/core": "^10.0.0"
+  },
+  "dependencies": {
+    "nestjs-pino": "^4.0.0",
+    "pino-http": "^10.0.0",
+    "pino-pretty": "^11.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "license": "MIT"
+}

@@ -23,13 +23,17 @@
     "@nestjs/passport": "^10.0.0",
     "@prisma/client": "^5.0.0 || ^6.0.0",
     "passport": "^0.7.0",
-    "@bbv/nestjs-otp": "^0.0.1"
+    "@bbv/nestjs-otp": "^0.0.1",
+    "@nestjs/swagger": "^7.0.0"
   },
   "peerDependenciesMeta": {
     "@nestjs/event-emitter": {
       "optional": true
     },
     "@bbv/nestjs-otp": {
+      "optional": true
+    },
+    "@nestjs/swagger": {
       "optional": true
     }
   },

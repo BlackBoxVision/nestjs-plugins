@@ -6,6 +6,8 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
+import { PermissionsGuard } from './guards/permissions.guard';
+import { OrgMemberGuard } from './guards/org-member.guard';
 import {
   AUTH_MODULE_OPTIONS,
   AuthModuleAsyncOptions,
@@ -48,6 +50,8 @@ export class AuthModule {
         AuthService,
         JwtAuthGuard,
         RolesGuard,
+        PermissionsGuard,
+        OrgMemberGuard,
         AUTH_MODULE_OPTIONS,
         ...AuthModule.getConditionalExports(options),
       ],
@@ -86,6 +90,8 @@ export class AuthModule {
         LocalStrategy,
         JwtAuthGuard,
         RolesGuard,
+        PermissionsGuard,
+        OrgMemberGuard,
         OrganizationService,
         AuthModule.createAsyncGoogleStrategyProvider(),
       ],
@@ -93,6 +99,8 @@ export class AuthModule {
         AuthService,
         JwtAuthGuard,
         RolesGuard,
+        PermissionsGuard,
+        OrgMemberGuard,
         OrganizationService,
         AUTH_MODULE_OPTIONS,
       ],
@@ -105,6 +113,8 @@ export class AuthModule {
       JwtStrategy,
       JwtAuthGuard,
       RolesGuard,
+      PermissionsGuard,
+      OrgMemberGuard,
     ];
 
     if (options.features?.emailPassword !== false) {
@@ -166,4 +176,5 @@ export class AuthModule {
       inject: [AUTH_MODULE_OPTIONS],
     };
   }
+
 }

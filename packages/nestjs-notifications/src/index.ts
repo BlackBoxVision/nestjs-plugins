@@ -17,11 +17,13 @@ export type { EmailJobData } from './channels/email/email.processor';
 
 // SMS providers
 export { TwilioSmsProvider } from './channels/sms/providers/twilio.provider';
+export { LogSmsProvider } from './channels/sms/providers/log.provider';
 export { SmsProcessor } from './channels/sms/sms.processor';
 export type { SmsJobData } from './channels/sms/sms.processor';
 
 // Push providers
 export { FirebasePushProvider } from './channels/push/providers/firebase.provider';
+export { LogPushProvider } from './channels/push/providers/log.provider';
 export { PushProcessor } from './channels/push/push.processor';
 export type { PushJobData } from './channels/push/push.processor';
 export { DeviceTokenService } from './channels/push/device-token.service';
@@ -36,6 +38,11 @@ export { TemplateService } from './templates/template.service';
 
 // Worker cleanup
 export { WorkerCleanupService } from './worker-cleanup.service';
+
+// DTOs
+export { NotificationQueryDto } from './dto/notification-query.dto';
+export { UpsertPreferenceDto } from './dto/upsert-preference.dto';
+export { RegisterDeviceDto } from './dto/register-device.dto';
 
 // Interfaces and constants
 export {

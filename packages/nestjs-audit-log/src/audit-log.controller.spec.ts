@@ -1,6 +1,7 @@
 import { AuditLogController } from './audit-log.controller';
 import { AuditLogService } from './audit-log.service';
-import { AUDIT_LOG_MODULE_OPTIONS, AuditLogModuleOptions } from './interfaces';
+import { AuditLogModuleOptions } from './interfaces';
+import { AuditLogQueryDto } from './dto/audit-log-query.dto';
 
 describe('AuditLogController', () => {
   let controller: AuditLogController;
@@ -35,9 +36,15 @@ describe('AuditLogController', () => {
     jest.clearAllMocks();
   });
 
+  function createQuery(overrides: Partial<AuditLogQueryDto> = {}): AuditLogQueryDto {
+    const query = new AuditLogQueryDto();
+    Object.assign(query, overrides);
+    return query;
+  }
+
   describe('findAll', () => {
     it('should call service.findAll with all undefined when no query params provided', async () => {
-      await controller.findAll();
+      await controller.findAll(createQuery());
 
       expect(mockAuditLogService.findAll).toHaveBeenCalledWith({
         userId: undefined,
@@ -46,25 +53,25 @@ describe('AuditLogController', () => {
         action: undefined,
         startDate: undefined,
         endDate: undefined,
-        page: undefined,
-        limit: undefined,
+        page: 0,
+        limit: 10,
       });
     });
 
-    it('should parse page and limit as integers and dates as Date objects', async () => {
+    it('should parse dates as Date objects', async () => {
       const startDate = '2025-01-01T00:00:00.000Z';
       const endDate = '2025-12-31T23:59:59.999Z';
 
-      await controller.findAll(
-        'user-1',
-        'Claim',
-        'claim-1',
-        'UPDATE',
+      await controller.findAll(createQuery({
+        userId: 'user-1',
+        entity: 'Claim',
+        entityId: 'claim-1',
+        action: 'UPDATE',
         startDate,
         endDate,
-        '2',
-        '10',
-      );
+        page: 2,
+        limit: 10,
+      }));
 
       expect(mockAuditLogService.findAll).toHaveBeenCalledWith({
         userId: 'user-1',
@@ -79,16 +86,11 @@ describe('AuditLogController', () => {
     });
 
     it('should handle partial query params correctly', async () => {
-      await controller.findAll(
-        'user-1',
-        undefined,
-        undefined,
-        'CREATE',
-        undefined,
-        undefined,
-        '1',
-        undefined,
-      );
+      await controller.findAll(createQuery({
+        userId: 'user-1',
+        action: 'CREATE',
+        page: 1,
+      }));
 
       expect(mockAuditLogService.findAll).toHaveBeenCalledWith({
         userId: 'user-1',
@@ -98,7 +100,7 @@ describe('AuditLogController', () => {
         startDate: undefined,
         endDate: undefined,
         page: 1,
-        limit: undefined,
+        limit: 10,
       });
     });
 
@@ -112,18 +114,18 @@ describe('AuditLogController', () => {
       };
       mockAuditLogService.findAll.mockResolvedValue(expectedResult);
 
-      const result = await controller.findAll();
+      const result = await controller.findAll(createQuery());
 
       expect(result).toEqual(expectedResult);
     });
 
     it('should pass string params through without transformation', async () => {
-      await controller.findAll(
-        'user-abc',
-        'Order',
-        'order-123',
-        'DELETE',
-      );
+      await controller.findAll(createQuery({
+        userId: 'user-abc',
+        entity: 'Order',
+        entityId: 'order-123',
+        action: 'DELETE',
+      }));
 
       expect(mockAuditLogService.findAll).toHaveBeenCalledWith(
         expect.objectContaining({

@@ -106,6 +106,7 @@ export class NotificationService {
 
     if (!this.emailQueue) {
       this.logger.error('Email queue is not available');
+      await this.markAsFailed(notificationId, 'Email queue is not available');
       return;
     }
 
@@ -157,6 +158,7 @@ export class NotificationService {
 
     if (!this.smsQueue) {
       this.logger.error('SMS queue is not available');
+      await this.markAsFailed(notificationId, 'SMS queue is not available');
       return;
     }
 
@@ -189,6 +191,7 @@ export class NotificationService {
 
     if (!this.pushQueue) {
       this.logger.error('Push queue is not available');
+      await this.markAsFailed(notificationId, 'Push queue is not available');
       return;
     }
 
@@ -238,5 +241,21 @@ export class NotificationService {
     this.logger.log(
       `Push notification ${notificationId} queued for ${devices.length} device(s)`,
     );
+  }
+
+  private async markAsFailed(
+    notificationId: string,
+    reason: string,
+  ): Promise<void> {
+    try {
+      await this.prisma.notification.update({
+        where: { id: notificationId },
+        data: { status: 'failed', data: { failureReason: reason } },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to update notification ${notificationId} status: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 }

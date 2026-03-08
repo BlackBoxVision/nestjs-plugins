@@ -4,6 +4,7 @@ model User {
   passwordHash    String?
   emailVerified   Boolean   @default(false)
   avatarUrl       String?
+  role            String    @default("user")
   isActive        Boolean   @default(true)
   lastLoginAt     DateTime?
   createdAt       DateTime  @default(now())

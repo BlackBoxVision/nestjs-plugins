@@ -1,32 +1,37 @@
 import { Body, Controller, Get, Put, Req } from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { PreferenceService } from './preference.service';
+import { UpsertPreferenceDto } from '../dto/upsert-preference.dto';
 
-interface UpsertPreferenceBody {
-  channel: string;
-  type: string;
-  enabled: boolean;
-}
-
+@ApiTags('Notification Preferences')
+@ApiBearerAuth()
 @Controller('notification-preferences')
 export class PreferenceController {
   constructor(private readonly preferenceService: PreferenceService) {}
 
   @Get()
-  async getPreferences(@Req() req: any) {
-    const userId = req.user?.id ?? req.user?.sub;
-
-    return this.preferenceService.getPreferences(userId);
+  @ApiOperation({ summary: 'Get notification preferences for the authenticated user' })
+  @ApiResponse({ status: 200, description: 'Preferences retrieved successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async getPreferences(@Req() req: Request & { user: { id: string } }) {
+    return this.preferenceService.getPreferences(req.user.id);
   }
 
   @Put()
+  @ApiOperation({ summary: 'Create or update a notification preference' })
+  @ApiResponse({ status: 200, description: 'Preference upserted successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   async upsertPreference(
-    @Req() req: any,
-    @Body() body: UpsertPreferenceBody,
+    @Req() req: Request & { user: { id: string } },
+    @Body() body: UpsertPreferenceDto,
   ) {
-    const userId = req.user?.id ?? req.user?.sub;
-
     return this.preferenceService.upsertPreference(
-      userId,
+      req.user.id,
       body.channel,
       body.type,
       body.enabled,
