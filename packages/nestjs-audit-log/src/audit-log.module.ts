@@ -14,6 +14,7 @@ import {
 } from './interfaces';
 import { AuditContextMiddleware } from './middleware/prisma-audit.middleware';
 import { AuditedInterceptor } from './decorators/audited.decorator';
+import { AuditMiddlewareRegistrar } from './audit-middleware-registrar';
 
 @Module({})
 export class AuditLogModule implements NestModule {
@@ -33,7 +34,7 @@ export class AuditLogModule implements NestModule {
     return {
       module: AuditLogModule,
       controllers,
-      providers: [optionsProvider, AuditLogService, AuditedInterceptor],
+      providers: [optionsProvider, AuditLogService, AuditedInterceptor, AuditMiddlewareRegistrar],
       exports: [AuditLogService, AUDIT_LOG_MODULE_OPTIONS],
       global: true,
     };
@@ -50,7 +51,7 @@ export class AuditLogModule implements NestModule {
       module: AuditLogModule,
       imports: options.imports ?? [],
       controllers: [AuditLogController],
-      providers: [asyncOptionsProvider, AuditLogService, AuditedInterceptor],
+      providers: [asyncOptionsProvider, AuditLogService, AuditedInterceptor, AuditMiddlewareRegistrar],
       exports: [AuditLogService, AUDIT_LOG_MODULE_OPTIONS],
       global: true,
     };

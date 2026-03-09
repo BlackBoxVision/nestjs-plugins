@@ -1,4 +1,5 @@
 export { AuditLogModule } from './audit-log.module';
+export { AuditMiddlewareRegistrar } from './audit-middleware-registrar';
 export { AuditLogService } from './audit-log.service';
 export { AuditLogController } from './audit-log.controller';
 export { AuditLogFeatureGuard } from './guards/feature-enabled.guard';

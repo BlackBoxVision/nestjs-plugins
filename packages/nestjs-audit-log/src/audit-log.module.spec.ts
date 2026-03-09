@@ -3,6 +3,7 @@ import { AuditLogService } from './audit-log.service';
 import { AuditLogController } from './audit-log.controller';
 import { AUDIT_LOG_MODULE_OPTIONS } from './interfaces';
 import { AuditedInterceptor } from './decorators/audited.decorator';
+import { AuditMiddlewareRegistrar } from './audit-middleware-registrar';
 
 describe('AuditLogModule', () => {
   describe('forRoot', () => {
@@ -19,6 +20,7 @@ describe('AuditLogModule', () => {
       expect(providerTokens).toContain(AuditLogService);
       expect(providerTokens).toContain(AuditedInterceptor);
       expect(providerTokens).toContain(AUDIT_LOG_MODULE_OPTIONS);
+      expect(providerTokens).toContain(AuditMiddlewareRegistrar);
     });
 
     it('should be globally scoped', () => {
@@ -186,6 +188,7 @@ describe('AuditLogModule', () => {
 
       expect(providerTokens).toContain(AuditLogService);
       expect(providerTokens).toContain(AuditedInterceptor);
+      expect(providerTokens).toContain(AuditMiddlewareRegistrar);
     });
   });
 

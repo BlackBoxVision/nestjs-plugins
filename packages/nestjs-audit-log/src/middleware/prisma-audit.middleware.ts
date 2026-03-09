@@ -36,6 +36,7 @@ export function createAuditMiddleware(
   const excludeEntities = new Set(
     (options.excludeEntities ?? []).map((e) => e.toLowerCase()),
   );
+  excludeEntities.add('auditlog');
   const excludeFields = new Set(options.excludeFields ?? ['password', 'hash', 'token', 'secret']);
 
   return async (params: any, next: (params: any) => Promise<any>) => {
