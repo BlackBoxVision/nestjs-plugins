@@ -20,6 +20,7 @@ import * as path from 'path';
     EventEmitterModule.forRoot(),
 
     LoggerModule.forRoot({
+      level: process.env.NODE_ENV === 'test' ? 'error' : 'info',
       prettyPrint: process.env.NODE_ENV !== 'production',
     }),
 

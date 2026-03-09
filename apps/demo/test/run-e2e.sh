@@ -40,8 +40,8 @@ docker compose exec -T minio sh -c \
   'mc alias set local http://localhost:9000 minioadmin minioadmin 2>/dev/null && mc mb --ignore-existing local/demo-uploads 2>/dev/null' \
   || echo "    WARNING: Could not create MinIO bucket (may already exist)"
 
-echo "==> Pushing Prisma schema to database..."
-npx prisma db push --skip-generate --accept-data-loss 2>&1
+echo "==> Resetting database (drop all tables + re-push schema)..."
+npx prisma db push --force-reset --skip-generate --accept-data-loss 2>&1
 
 echo "==> Generating Prisma client..."
 npx prisma generate 2>&1
