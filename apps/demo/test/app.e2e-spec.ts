@@ -934,8 +934,7 @@ describe('Demo App (e2e)', () => {
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ userId: '00000000-0000-0000-0000-000000000000', role: 'member' });
 
-      // Should error — foreign key constraint or not found
-      expect([400, 404, 500]).toContain(res.status);
+      expect(res.status).toBe(404);
     });
   });
 

@@ -24,6 +24,9 @@ describe('OrganizationService', () => {
         update: jest.fn(),
         count: jest.fn(),
       },
+      user: {
+        findUnique: jest.fn(),
+      },
     };
 
     service = new OrganizationService(prisma);
@@ -247,6 +250,7 @@ describe('OrganizationService', () => {
 
     it('should add a member to the organization', async () => {
       prisma.organization.findUnique.mockResolvedValue({ id: organizationId });
+      prisma.user.findUnique.mockResolvedValue({ id: userId });
       prisma.organizationMember.findUnique.mockResolvedValue(null);
       const createdMember = {
         userId,
@@ -281,6 +285,7 @@ describe('OrganizationService', () => {
 
     it('should use default role "member" when role is not provided', async () => {
       prisma.organization.findUnique.mockResolvedValue({ id: organizationId });
+      prisma.user.findUnique.mockResolvedValue({ id: userId });
       prisma.organizationMember.findUnique.mockResolvedValue(null);
       prisma.organizationMember.create.mockResolvedValue({
         userId,
@@ -309,8 +314,22 @@ describe('OrganizationService', () => {
       expect(prisma.organizationMember.create).not.toHaveBeenCalled();
     });
 
+    it('should throw NotFoundException when user does not exist', async () => {
+      prisma.organization.findUnique.mockResolvedValue({ id: organizationId });
+      prisma.user.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.addMember(organizationId, userId, role),
+      ).rejects.toThrow(NotFoundException);
+      await expect(
+        service.addMember(organizationId, userId, role),
+      ).rejects.toThrow('User not found');
+      expect(prisma.organizationMember.create).not.toHaveBeenCalled();
+    });
+
     it('should throw BadRequestException when user is already a member', async () => {
       prisma.organization.findUnique.mockResolvedValue({ id: organizationId });
+      prisma.user.findUnique.mockResolvedValue({ id: userId });
       prisma.organizationMember.findUnique.mockResolvedValue({
         userId,
         organizationId,

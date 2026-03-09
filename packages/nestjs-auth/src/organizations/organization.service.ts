@@ -158,6 +158,14 @@ export class OrganizationService {
       throw new NotFoundException('Organization not found');
     }
 
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
     const existing = await this.prisma.organizationMember.findUnique({
       where: {
         userId_organizationId: {
